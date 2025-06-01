@@ -12,4 +12,5 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Classifying and drop-in autoloading of assets.
+- Various icons sourced from the amazing game-icons.net.
 - Git repository creation and language scaffolding.
