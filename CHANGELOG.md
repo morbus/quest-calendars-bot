@@ -11,5 +11,5 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Class-ifying and drop-in autoloading of assets.
+- Classifying and drop-in autoloading of assets.
 - Git repository creation and language scaffolding.
