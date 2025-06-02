@@ -37,8 +37,8 @@ Dotenv\Dotenv::createImmutable(__DIR__.'/../')->load();
 // Addons.
 $addonDirs = [
     __DIR__.'/../src',
-    __DIR__.'/../contrib',
     __DIR__.'/../custom',
+    // __DIR__.'/../contrib/REPOSITORY-NAME',
 ];
 
 // Autoload addons too.
@@ -69,11 +69,41 @@ $questCalendarsBot = new QuestCalendarsBot([
 
 $questCalendarsBot->on('init', static function (QuestCalendarsBot $questCalendarsBot) {
     // Start the bot normally.
-    if (null === $GLOBALS['options']) {
+    if (!count($GLOBALS['options'])) {
         $questCalendarsBot->loadAddons();
         $questCalendarsBot->updatePresence(new Activity($questCalendarsBot, [
             'type' => Activity::TYPE_WATCHING,
             'name' => 'for /start',
         ]));
+    }
+
+    // Register application commands.
+    // The Discord Developer Portal says "There is a global rate limit of 200
+    // application command creates per day, per guild", and the DiscordPHP wiki
+    // continues with "Commands are part of data tied to your Bot Application
+    // and Guild, NOT your code. Therefore, registering commands should only be
+    // done once or when the command definition needs to be updated, NOT every
+    // time your bot starts and is ready."
+    //
+    // @see https://discord.com/developers/docs/interactions/application-commands
+    // @see https://github.com/discord-php/DiscordPHP/wiki/Slash-Command
+    if (isset($GLOBALS['options']['register'])) {
+        $questCalendarsBot->findAssets(['QuestCalendarsBot\Attribute\Command']);
+        $questCalendarsBot->loadCommandAssets();
+        $pendingPromises = [];
+
+        foreach (array_keys($questCalendarsBot->assets['QuestCalendarsBot\Attribute\Command']) as $commandClass) {
+            $pendingPromises[] = $questCalendarsBot->application->commands->save(
+                $questCalendarsBot->application->commands->create(
+                    (new $commandClass())->getCommandBuilder($questCalendarsBot)->toArray()
+                )
+            );
+        }
+
+        // Wait until all registrations have completed.
+        \React\Promise\all($pendingPromises)->then(function ($resolved) use ($questCalendarsBot) {
+            $questCalendarsBot->getLogger()->notice('Application commands have been registered');
+            $questCalendarsBot->close();
+        });
     }
 });
