@@ -23,7 +23,7 @@ class QuestCalendarsBot extends Discord
     /**
      * Known assets sorted by their attribute.
      *
-     * @var array<0|class-string, array<0|class-string, ?object>>
+     * @var array<class-string, array<?class-string, array<?string, string>>>
      */
     public array $assets = [];
 
@@ -79,6 +79,7 @@ class QuestCalendarsBot extends Discord
     {
         // Default attributes.
         $attributes = $attributes ?: [
+            'QuestCalendarsBot\Attribute\Calendar',
             'QuestCalendarsBot\Attribute\Command',
         ];
         $this->getLogger()->debug('inside');
@@ -90,7 +91,7 @@ class QuestCalendarsBot extends Discord
         // Turn addon files into a class name, then check the attributes.
         // If a class uses the desired attributes, store it in $this->assets.
         foreach ($finder as $file) {
-            $this->getLogger()->debug('Checking if '.$file->getRealPath().' is a requested QuestCalendarsBot asset');
+            $this->getLogger()->debug('Checking if '.$file->getRealPath().' is a QuestCalendarsBot asset');
             $assetClass = str_replace($this->addonDirs, '', $file->getPathname());
             $assetClass = str_replace(['/', '.php'], ['\\', ''], $assetClass);
 
@@ -99,8 +100,8 @@ class QuestCalendarsBot extends Discord
             $assetAttributes = $reflector->getAttributes();
             foreach ($assetAttributes as $assetAttribute) {
                 if (\in_array($assetAttribute->getName(), $attributes, true)) {
-                    $this->getLogger()->info($file->getRealPath().' uses attribute '.$assetAttribute->getName());
-                    $this->assets[$assetAttribute->getName()][$assetClass] = null;
+                    $this->getLogger()->info($file->getRealPath().' uses '.$assetAttribute->getName());
+                    $this->assets[$assetAttribute->getName()][$assetClass] = $assetAttribute->getArguments();
                 }
             }
         }
@@ -112,7 +113,18 @@ class QuestCalendarsBot extends Discord
     public function loadAddons(): void
     {
         $this->findAssets();
+        $this->loadCalendarAssets();
         $this->loadCommandAssets();
+    }
+
+    /**
+     * Load calendar assets.
+     */
+    public function loadCalendarAssets(): void
+    {
+        foreach ($this->assets['QuestCalendarsBot\Attribute\Calendar'] as $calendarClass => $attributeArguments) {
+            $this->getLogger()->notice('Found calendar '.$attributeArguments['id'].' in '.$calendarClass);
+        }
     }
 
     /**
