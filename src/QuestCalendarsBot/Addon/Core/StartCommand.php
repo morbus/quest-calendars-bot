@@ -41,5 +41,7 @@ class StartCommand implements CommandInterface
      */
     public function handle(Interaction $interaction): void
     {
+        // [LATER] Determine if player is on existing quest. "Start" or "Continue"?
+        // [NEXT] Show paginated list of all quest calendars with "Start this quest" button.
     }
 }
