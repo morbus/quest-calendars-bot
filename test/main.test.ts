@@ -96,3 +96,15 @@ test(
 		assert.match(output, /LOG_DIR has a log file that can't be written to: .*quest-calendars-bot\.log/);
 	},
 );
+
+// Root can enter any directory, so this can only be checked as another user.
+test("startup fails, naming LOG_DIR, when LOG_DIR can't be entered", { skip: process.getuid?.() === 0 }, async () => {
+	const dir = join(await tempDir(), 'no-entry');
+	await mkdir(dir);
+	await chmod(dir, 0o600);
+
+	const { code, output } = await start({ LOG_DIR: dir });
+
+	assert.equal(code, 1);
+	assert.match(output, /LOG_DIR is not a directory that can be written to: .*no-entry/);
+});

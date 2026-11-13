@@ -29,7 +29,7 @@ const LOG_FILE = 'quest-calendars-bot.log';
 function prepareLogDir(dir: string): void {
 	try {
 		mkdirSync(dir, { recursive: true });
-		accessSync(dir, constants.W_OK);
+		accessSync(dir, constants.W_OK | constants.X_OK);
 	} catch (error) {
 		throw new Error(`LOG_DIR is not a directory that can be written to: ${dir}`, { cause: error });
 	}
