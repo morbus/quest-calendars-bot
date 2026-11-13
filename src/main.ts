@@ -33,7 +33,7 @@ async function main(): Promise<void> {
 		return;
 	}
 	if (!isTimezone(timezone)) {
-		logger.error(`GAME_TIMEZONE is not an IANA timezone: ${timezone}`);
+		logger.error(`GAME_TIMEZONE is not a valid timezone: ${timezone}`);
 		process.exitCode = 1;
 		return;
 	}
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
 }
 
 /**
- * Whether `timezone` names an IANA timezone, such as "America/New_York".
+ * Whether `timezone` is one `Intl` accepts, such as "America/New_York" or "+05:00".
  */
 function isTimezone(timezone: string): boolean {
 	try {

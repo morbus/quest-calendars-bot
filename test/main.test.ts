@@ -42,6 +42,6 @@ test('startup fails when the timezone is not a real one', async () => {
 	const { code, output } = await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'Mars/Olympus_Mons' });
 
 	assert.equal(code, 1);
-	assert.match(output, /GAME_TIMEZONE is not an IANA timezone: Mars\/Olympus_Mons/);
+	assert.match(output, /GAME_TIMEZONE is not a valid timezone: Mars\/Olympus_Mons/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
