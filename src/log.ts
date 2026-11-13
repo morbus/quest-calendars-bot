@@ -19,6 +19,19 @@ const consoleLine = winston.format.printf(({ timestamp, level, message, stack, .
 });
 
 /**
+ * Drops the `url` and `requestBody` that discord.js puts on a failed request's error.
+ *
+ * @remarks
+ * A reply's URL holds the interaction's token, which lets anyone holding it answer for the bot,
+ * and its body holds what only the Player should see.
+ */
+const dropDiscordRequest = winston.format((info) => {
+	delete info.url;
+	delete info.requestBody;
+	return info;
+});
+
+/**
  * The bot's logger.
  *
  * @remarks
@@ -26,7 +39,11 @@ const consoleLine = winston.format.printf(({ timestamp, level, message, stack, .
  */
 export const logger = winston.createLogger({
 	level: 'info',
-	format: winston.format.combine(winston.format.errors({ stack: true }), winston.format.timestamp()),
+	format: winston.format.combine(
+		winston.format.errors({ stack: true }),
+		dropDiscordRequest(),
+		winston.format.timestamp(),
+	),
 	transports: [
 		new winston.transports.Console({
 			format: winston.format.combine(consoleLine, winston.format.colorize({ all: true })),
