@@ -2,7 +2,8 @@
  * Colored log lines for the console, and JSON lines in a rotated quest-calendars-bot.log.
  */
 
-import { accessSync, constants, mkdirSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import winston from 'winston';
 
@@ -12,12 +13,18 @@ import winston from 'winston';
 const LOG_DIR = process.env.LOG_DIR || fileURLToPath(new URL('../logs/', import.meta.url));
 
 /**
+ * The name of the current log file in {@link LOG_DIR}.
+ */
+const LOG_FILE = 'quest-calendars-bot.log';
+
+/**
  * Creates `dir` if needed, and checks that the logs can be written there.
  *
  * @remarks
- * Run before the logger exists, so a bad directory stops startup with its name instead of crashing on the first write.
+ * Run before the logger exists, so a bad directory or log file stops startup with its name,
+ * instead of crashing on the first write or leaving the log file silently empty.
  *
- * @throws When `dir` can't be created or written to.
+ * @throws When `dir` can't be created or written to, or it holds a log file that can't be written to.
  */
 function prepareLogDir(dir: string): void {
 	try {
@@ -25,6 +32,14 @@ function prepareLogDir(dir: string): void {
 		accessSync(dir, constants.W_OK);
 	} catch (error) {
 		throw new Error(`LOG_DIR is not a directory that can be written to: ${dir}`, { cause: error });
+	}
+
+	const file = join(dir, LOG_FILE);
+	if (!existsSync(file)) return;
+	try {
+		accessSync(file, constants.W_OK);
+	} catch (error) {
+		throw new Error(`LOG_DIR has a log file that can't be written to: ${file}`, { cause: error });
 	}
 }
 
@@ -90,7 +105,7 @@ export const logger = winston.createLogger({
 		}),
 		new winston.transports.File({
 			dirname: LOG_DIR,
-			filename: 'quest-calendars-bot.log',
+			filename: LOG_FILE,
 			maxsize: 5 * 1024 * 1024,
 			maxFiles: 6,
 			tailable: true,

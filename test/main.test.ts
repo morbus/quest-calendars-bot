@@ -80,3 +80,19 @@ test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', { skip: process
 	assert.equal(code, 1);
 	assert.match(output, /LOG_DIR is not a directory that can be written to: .*read-only/);
 });
+
+// Root can write to a read-only file, so this can only be checked as another user.
+test(
+	'startup fails, naming the file, when the log file in LOG_DIR is read-only',
+	{ skip: process.getuid?.() === 0 },
+	async () => {
+		const dir = await tempDir();
+		await writeFile(join(dir, 'quest-calendars-bot.log'), '');
+		await chmod(join(dir, 'quest-calendars-bot.log'), 0o444);
+
+		const { code, output } = await start({ LOG_DIR: dir });
+
+		assert.equal(code, 1);
+		assert.match(output, /LOG_DIR has a log file that can't be written to: .*quest-calendars-bot\.log/);
+	},
+);
