@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './temp-dir.ts';
@@ -104,5 +104,16 @@ test("startup fails, naming DB_PATH, when DB_PATH can't be opened", async () => 
 
 	assert.equal(code, 1);
 	assert.match(output, /DB_PATH can't be opened: .*missing\/game\.sqlite/);
+	assert.doesNotMatch(output, /Opened game state/);
+});
+
+test('startup fails, naming DB_PATH, when DB_PATH is not a database', async () => {
+	const path = join(await tempDir(), 'notes.txt');
+	await writeFile(path, 'This is not a database.');
+
+	const { code, output } = await start({ DB_PATH: path, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
+
+	assert.equal(code, 1);
+	assert.match(output, /DB_PATH can't be opened: .*notes\.txt/);
 	assert.doesNotMatch(output, /Opened game state/);
 });

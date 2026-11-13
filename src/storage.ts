@@ -27,11 +27,13 @@ const BUSY_TIMEOUT_MS = 2000;
 /**
  * Opens the SQLite file at `path`, creating it if needed.
  *
- * @throws When the file can't be opened.
+ * @throws When the file can't be opened, or isn't a SQLite database.
  */
 export function openStorage(path: string): Storage {
 	// Wait for another writer on the same file (an overlapping restart) instead of failing at once.
 	const db = new DatabaseSync(path, { timeout: BUSY_TIMEOUT_MS });
+	// Opening doesn't read the file, so read it now: a file that isn't a database fails here, not on first use.
+	db.exec('PRAGMA schema_version');
 
 	return {
 		transaction(work) {
