@@ -18,8 +18,9 @@ const DB_PATH = fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.me
  * Starts the bot.
  *
  * @remarks
- * Failures set the exit code and return, rather than calling `process.exit()`,
- * so the last log lines reach the log file before Node exits.
+ * Failures set the exit code and return, rather than calling `process.exit()` at once,
+ * so the last log lines reach the log file before Node exits. A failure that throws is forced
+ * to exit shortly after, in case something such as the Discord client still holds Node open.
  */
 async function main(): Promise<void> {
 	logger.info('Starting Quest Calendars Bot');
@@ -45,6 +46,11 @@ async function main(): Promise<void> {
 }
 
 /**
+ * How long a failed startup waits for its last log lines to be written before it forces Node to exit.
+ */
+const EXIT_GRACE_MS = 1000;
+
+/**
  * Whether `timezone` is one `Intl` accepts, such as "America/New_York" or "+05:00".
  */
 function isTimezone(timezone: string): boolean {
@@ -59,4 +65,7 @@ function isTimezone(timezone: string): boolean {
 main().catch((error) => {
 	logger.error('Startup failed', error);
 	process.exitCode = 1;
+	// A failed login can leave discord.js reconnecting without its token, which keeps Node running.
+	// Exit once the log has had time to be written. The timer doesn't keep Node alive by itself.
+	setTimeout(() => process.exit(), EXIT_GRACE_MS).unref();
 });
