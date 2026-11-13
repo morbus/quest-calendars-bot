@@ -17,7 +17,8 @@ async function start(env: Record<string, string>): Promise<{ code: number | null
 	let output = '';
 	child.stdout.on('data', (chunk) => (output += chunk));
 	child.stderr.on('data', (chunk) => (output += chunk));
-	const [code] = await once(child, 'exit');
+	// 'close' waits for the output pipes to drain, which 'exit' doesn't.
+	const [code] = await once(child, 'close');
 	return { code, output };
 }
 

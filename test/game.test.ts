@@ -22,10 +22,10 @@ function scriptedDice(rolls: number[]): Dice {
 }
 
 /**
- * A Game with in-memory storage, scripted dice, and no Quests.
+ * A Game with in-memory storage, dice with no rolls scripted, and no Quests.
  */
-function newGame({ rolls = [] }: { rolls?: number[] } = {}): Game {
-	return createGame({ dice: scriptedDice(rolls), storage: openStorage(':memory:'), timezone: 'America/New_York' });
+function newGame(): Game {
+	return createGame({ dice: scriptedDice([]), storage: openStorage(':memory:'), timezone: 'America/New_York' });
 }
 
 test('/quest start says no Quests are available', () => {
