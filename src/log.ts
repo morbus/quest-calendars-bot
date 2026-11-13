@@ -1,9 +1,14 @@
 /**
- * Colored log lines for the console, and JSON lines in a rotated logs/quest-calendars-bot.log, relative to
- * where the bot runs from.
+ * Colored log lines for the console, and JSON lines in a rotated logs/quest-calendars-bot.log in the project.
  */
 
+import { fileURLToPath } from 'node:url';
 import winston from 'winston';
+
+/**
+ * The log file, in the project's logs/ wherever the bot is started from.
+ */
+const LOG_FILE = fileURLToPath(new URL('../logs/quest-calendars-bot.log', import.meta.url));
 
 /**
  * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
@@ -64,7 +69,7 @@ export const logger = winston.createLogger({
 			handleRejections: true,
 		}),
 		new winston.transports.File({
-			filename: 'logs/quest-calendars-bot.log',
+			filename: LOG_FILE,
 			maxsize: 5 * 1024 * 1024,
 			maxFiles: 6,
 			tailable: true,

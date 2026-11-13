@@ -6,6 +6,12 @@ import { startBot } from './discord.ts';
 import { createGame } from './game.ts';
 import { logger } from './log.ts';
 import { openStorage } from './storage.ts';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * The SQLite file that holds the game state, in the project wherever the bot is started from.
+ */
+const DB_FILE = fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.meta.url));
 
 /**
  * How long a failed startup waits for its last log lines to be written before it forces Node to exit.
@@ -21,11 +27,11 @@ const EXIT_GRACE_MS = 1000;
  * to exit shortly after, in case something such as the Discord client still holds Node open.
  */
 async function main(): Promise<void> {
-	const { DB_FILE: dbFile, DISCORD_TOKEN: token, GAME_TIMEZONE: timezone } = process.env;
+	const { DISCORD_TOKEN: token, GAME_TIMEZONE: timezone } = process.env;
 	logger.info('Starting Quest Calendars Bot');
 
-	if (!token || !timezone || !dbFile) {
-		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE', !dbFile && 'DB_FILE'].filter(Boolean);
+	if (!token || !timezone) {
+		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE'].filter(Boolean);
 		logger.error(`Missing environment variables: ${missing.join(', ')}`);
 		process.exitCode = 1;
 		return;
@@ -39,13 +45,13 @@ async function main(): Promise<void> {
 
 	let storage;
 	try {
-		storage = openStorage(dbFile);
+		storage = openStorage(DB_FILE);
 	} catch (error) {
-		logger.error(`DB_FILE can't be opened: ${dbFile}`, error);
+		logger.error(`Game state can't be opened: ${DB_FILE}`, error);
 		process.exitCode = 1;
 		return;
 	}
-	logger.info('Opened game state', { from: dbFile });
+	logger.info('Opened game state', { from: DB_FILE });
 
 	await startBot({ game: createGame({ storage }), token });
 }
