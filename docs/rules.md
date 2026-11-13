@@ -33,12 +33,12 @@ Multiple people can play on a single calendar if every player plays separately. 
 
 Strength (STR), Dexterity (DEX), Constitution (CON), Intellect (INT), Wisdom (WIS), and Charisma (CHA) are bonus modifiers used on various rolls throughout the year. Your health indicates your villain's vitality. A low health means your villain is close to death. Defense, Attack, and Damage are primarily used in combat but may have other uses while adventuring.
 
-| Stat | Meaning |
-| --- | --- |
-| Max Health (HP) | The amount of damage you can take before dying. |
-| Defense (DEF) | The bonus you receive when rolling to avoid getting hit by an enemy. |
-| Attack (ATK) | The bonus you receive when rolling to hit an enemy. |
-| Damage (DMG) | The dice you will roll to see how much damage to apply to enemies. |
+| Stat            | Meaning                                                              |
+| --------------- | -------------------------------------------------------------------- |
+| Max Health (HP) | The amount of damage you can take before dying.                      |
+| Defense (DEF)   | The bonus you receive when rolling to avoid getting hit by an enemy. |
+| Attack (ATK)    | The bonus you receive when rolling to hit an enemy.                  |
+| Damage (DMG)    | The dice you will roll to see how much damage to apply to enemies.   |
 
 ## Dice
 
@@ -58,11 +58,11 @@ If your character has a +2 for Intellect, roll the 20-sided die and add +2 to th
 
 Each page may present possible options for how you deal with the situation. If you are meant to choose just one option, you will see the options listed alphabetically such as A, B, C. If you are meant to do each, they will be listed numerically such as 1, 2, 3. For example:
 
-| Options | Meaning |
-| --- | --- |
-| A), B) | Choose to do either A or B. |
-| 1), 2) | Do action 1. Then do action 2. |
-| 1), 2-A), 2-B) | Do action 1. Then choose to do either 2-A or 2-B. |
+| Options        | Meaning                                              |
+| -------------- | ---------------------------------------------------- |
+| A), B)         | Choose to do either A or B.                          |
+| 1), 2)         | Do action 1. Then do action 2.                       |
+| 1), 2-A), 2-B) | Do action 1. Then choose to do either 2-A or 2-B.    |
 | A), B-1), B-2) | Choose to do either A or B (doing both B-1 and B-2). |
 
 ## Resolving the Events of the Day
@@ -105,9 +105,9 @@ In general, if you successfully hit with your Attack and then do enough Damage t
 
 The enemy's stats will be presented as a series of icons and numbers:
 
-| | Defense | Health | Attack | Damage (full/partial) | Gold |
-| --- | --- | --- | --- | --- | --- |
-| Enemy 1 | 12 | 5 | 13 | 2/1 | 1 |
+|         | Defense | Health | Attack | Damage (full/partial) | Gold |
+| ------- | ------- | ------ | ------ | --------------------- | ---- |
+| Enemy 1 | 12      | 5      | 13     | 2/1                   | 1    |
 
 In each round:
 
@@ -124,9 +124,9 @@ In each round:
 
 There are encounters in which you must fight an enemy to the death. These will be explicitly described. Here, the enemy will have a high amount of health, and you will repeat the combat until you have reduced the enemy's health to zero. Until the enemy is defeated, you risk taking damage each round.
 
-| | Defense | Health | Attack | Damage (full/partial) | Gold |
-| --- | --- | --- | --- | --- | --- |
-| Boss | 12 | 25 | 13 | d4/0 | 1 |
+|      | Defense | Health | Attack | Damage (full/partial) | Gold |
+| ---- | ------- | ------ | ------ | --------------------- | ---- |
+| Boss | 12      | 25     | 13     | d4/0                  | 1    |
 
 You may even be responsible for rolling the enemy's damage. Note the [d4] for the enemy's damage.
 
@@ -236,14 +236,14 @@ Throughout the calendar, there are some days where you can find treasure hidden 
 
 These icons may not always be easy to find as they will be hidden on the page. Keep an eye out for them. If you spot this icon, roll d6 and consult the following table to see which item you find:
 
-| d6 | Item |
-| --- | --- |
-| 1 | NightShade |
-| 2 | Wolfsbane |
-| 3 | Cryptweed |
-| 4 | Blightroot |
-| 5 | Bonedust |
-| 6 | Moonmoss |
+| d6  | Item       |
+| --- | ---------- |
+| 1   | NightShade |
+| 2   | Wolfsbane  |
+| 3   | Cryptweed  |
+| 4   | Blightroot |
+| 5   | Bonedust   |
+| 6   | Moonmoss   |
 
 These items are ingredients used in crafting. See the Crafting section for details on what can be made and when.
 
@@ -254,20 +254,21 @@ Sometimes, the dice can be unforgiving with the fate of your character. It is li
 1. **The gods demand a price.** Lose half (50%) of your gold, rounded up. If you have none, reroll the d4 again.
 2. **Suffer a debilitating Wound.** Roll a d10:
 
-   | d10 | Wound |
-   | --- | --- |
-   | 1 | Reduce your Strength by 1. |
-   | 2 | Reduce your Dexterity by 1. |
-   | 3 | Reduce your Constitution by 1. |
-   | 4 | Reduce your Intellect by 1. |
-   | 5 | Reduce your Wisdom by 1. |
-   | 6 | Reduce your Charisma by 1. |
-   | 7 | Reduce your Max Health by 2. |
-   | 8 | Reduce your Defense by 1. |
-   | 9 | Reduce your Attack by 1. |
-   | 10 | Take a -1 penalty to all Damage rolls. |
+   | d10 | Wound                                  |
+   | --- | -------------------------------------- |
+   | 1   | Reduce your Strength by 1.             |
+   | 2   | Reduce your Dexterity by 1.            |
+   | 3   | Reduce your Constitution by 1.         |
+   | 4   | Reduce your Intellect by 1.            |
+   | 5   | Reduce your Wisdom by 1.               |
+   | 6   | Reduce your Charisma by 1.             |
+   | 7   | Reduce your Max Health by 2.           |
+   | 8   | Reduce your Defense by 1.              |
+   | 9   | Reduce your Attack by 1.               |
+   | 10  | Take a -1 penalty to all Damage rolls. |
 
    A single Wound can be removed during a Rest. These may also be removed by an item called Dragon's Blood or through certain villain abilities. Since these injuries can be restored, note the injury down on your villain sheet.
+
 3. **Your body was looted while you were dead.** Sacrifice one of your specialized equipment items. If you do not have one, roll the d4 again.
 4. **The gods are favorable.** You are resurrected successfully, but death takes its toll. Mark all "Use per Rest" abilities, Surge Points, and Spell Points as used until your next rest.
 
@@ -314,33 +315,33 @@ Minions are followers you gain throughout your journey, either by choice or by c
 
 Crafting can only be done at a Rest. When crafting, you will exchange a number of raw ingredients for a single item using the list below. When using any abilities for crafting, such as Ysora's Cauldron Mastery, you may either craft before or after recovering your Spell Points, but not both. You may craft any number of potions as long as you have the raw ingredients for them.
 
-| Item | NightShade | Wolfsbane | Cryptweed | Blightroot | Bonedust | Moonmoss |
-| --- | --- | --- | --- | --- | --- | --- |
-| Elixir of Might | 1 | 1 | 1 | | | |
-| Elixir of Speed | | 1 | 1 | 1 | | |
-| Elixir of Fortitude | | | 1 | 1 | 1 | |
-| Elixir of Insight | | | | 1 | 1 | 1 |
-| Elixir of Wits | 1 | | | | 1 | 1 |
-| Elixir of Charm | 1 | 1 | | | | 1 |
-| Dragon's Fire | 2 | 1 | 1 | 1 | | |
-| Combat Tonic | | 2 | 1 | 1 | 1 | |
-| Warding Ointment | | | 2 | 1 | 1 | 1 |
-| Hex Cleanse | 1 | | | 2 | 1 | 1 |
-| Health Potion | 1 | 1 | | | 2 | 1 |
-| Antidote | 1 | 1 | 1 | | | 2 |
+| Item                | NightShade | Wolfsbane | Cryptweed | Blightroot | Bonedust | Moonmoss |
+| ------------------- | ---------- | --------- | --------- | ---------- | -------- | -------- |
+| Elixir of Might     | 1          | 1         | 1         |            |          |          |
+| Elixir of Speed     |            | 1         | 1         | 1          |          |          |
+| Elixir of Fortitude |            |           | 1         | 1          | 1        |          |
+| Elixir of Insight   |            |           |           | 1          | 1        | 1        |
+| Elixir of Wits      | 1          |           |           |            | 1        | 1        |
+| Elixir of Charm     | 1          | 1         |           |            |          | 1        |
+| Dragon's Fire       | 2          | 1         | 1         | 1          |          |          |
+| Combat Tonic        |            | 2         | 1         | 1          | 1        |          |
+| Warding Ointment    |            |           | 2         | 1          | 1        | 1        |
+| Hex Cleanse         | 1          |           |           | 2          | 1        | 1        |
+| Health Potion       | 1          | 1         |           |            | 2        | 1        |
+| Antidote            | 1          | 1         | 1         |            |          | 2        |
 
 ## Sunday Lottery
 
 You can participate in a lottery every Sunday, though this is not indicated on the page. It is an optional roll that could result in you gaining or losing gold. Each Sunday, you may roll d6:
 
-| d6 | Result |
-| --- | --- |
-| 1 | Lose 2 gold |
-| 2 | Lose 1 gold |
-| 3 | Gain 1 gold |
-| 4 | Gain 2 gold |
-| 5 | Gain 3 gold |
-| 6 | Gain 4 gold |
+| d6  | Result      |
+| --- | ----------- |
+| 1   | Lose 2 gold |
+| 2   | Lose 1 gold |
+| 3   | Gain 1 gold |
+| 4   | Gain 2 gold |
+| 5   | Gain 3 gold |
+| 6   | Gain 4 gold |
 
 ## Shops
 

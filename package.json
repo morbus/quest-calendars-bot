@@ -1,0 +1,26 @@
+{
+	"name": "quest-calendars-bot",
+	"description": "A Discord bot to play Quest Calendars one Page a day.",
+	"type": "module",
+	"private": true,
+	"engines": {
+		"node": ">=26"
+	},
+	"scripts": {
+		"start": "node --env-file-if-exists=.env src/main.ts",
+		"check": "npm run typecheck && npm run lint && npm test",
+		"format": "prettier --write .",
+		"lint": "prettier --check .",
+		"test": "node --test 'test/**/*.test.ts'",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"discord.js": "14.27.0",
+		"winston": "3.19.0"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.5",
+		"prettier": "3.9.10",
+		"typescript": "7.0.2"
+	}
+}
