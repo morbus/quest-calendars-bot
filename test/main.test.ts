@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,4 +57,25 @@ test('startup writes its log file to LOG_DIR', async () => {
 	// A missing file reads as empty, so the assertion below reports it.
 	const log = await readFile(join(logDir, 'quest-calendars-bot.log'), 'utf8').catch(() => '');
 	assert.match(log, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE/);
+});
+
+test('startup fails, naming LOG_DIR, when LOG_DIR is a file', async () => {
+	const file = join(await mkdtemp(join(tmpdir(), 'quest-calendars-bot-')), 'not-a-directory');
+	await writeFile(file, '');
+
+	const { code, output } = await start({ LOG_DIR: file });
+
+	assert.equal(code, 1);
+	assert.match(output, /LOG_DIR is not a directory that can be written to: .*not-a-directory/);
+});
+
+test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', async () => {
+	const dir = join(await mkdtemp(join(tmpdir(), 'quest-calendars-bot-')), 'read-only');
+	await mkdir(dir);
+	await chmod(dir, 0o555);
+
+	const { code, output } = await start({ LOG_DIR: dir });
+
+	assert.equal(code, 1);
+	assert.match(output, /LOG_DIR is not a directory that can be written to: .*read-only/);
 });

@@ -2,6 +2,7 @@
  * Colored log lines for the console, and JSON lines in a rotated quest-calendars-bot.log.
  */
 
+import { accessSync, constants, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import winston from 'winston';
 
@@ -9,6 +10,14 @@ import winston from 'winston';
  * Where the log files go: the LOG_DIR environment variable, or logs/ in the project root.
  */
 const LOG_DIR = process.env.LOG_DIR || fileURLToPath(new URL('../logs/', import.meta.url));
+
+// Check the directory now, so a bad one stops startup with its name instead of crashing on the first write.
+try {
+	mkdirSync(LOG_DIR, { recursive: true });
+	accessSync(LOG_DIR, constants.W_OK);
+} catch (error) {
+	throw new Error(`LOG_DIR is not a directory that can be written to: ${LOG_DIR}`, { cause: error });
+}
 
 /**
  * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
