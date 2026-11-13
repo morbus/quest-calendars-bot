@@ -28,22 +28,31 @@ const consoleLine = winston.format.printf(({ timestamp, level, message, stack, .
 });
 
 /**
- * Drops the `url` and `requestBody` that discord.js puts on a failed request's error.
+ * The interaction token in a Discord webhook or interaction URL, after the ID it belongs to.
+ */
+const DISCORD_TOKEN_IN_URL = /(\/(?:webhooks|interactions)\/\d+\/)[^/?]+/g;
+
+/**
+ * Masks the token in a `url` field and drops a `requestBody` field, as discord.js puts on a failed request's error.
+ */
+function scrubDiscordRequest(fields: Record<string, unknown>): void {
+	delete fields.requestBody;
+	if (typeof fields.url === 'string') fields.url = fields.url.replace(DISCORD_TOKEN_IN_URL, '$1:token');
+}
+
+/**
+ * Keeps Discord's interaction tokens and request bodies out of the logs.
  *
  * @remarks
  * A reply's URL holds the interaction's token, which lets anyone holding it answer for the bot,
- * and its body holds what only the Player should see. Other fields named `url` are kept.
+ * and its body holds what only the Player should see. The rest of the URL is kept, for debugging.
  */
 const dropDiscordRequest = winston.format((info) => {
-	if ('requestBody' in info) {
-		delete info.url;
-		delete info.requestBody;
-	}
+	scrubDiscordRequest(info);
 	// Unhandled exceptions and rejections arrive nested under `error`. Copy it rather than change the caller's error.
-	if (typeof info.error === 'object' && info.error !== null && 'requestBody' in info.error) {
+	if (typeof info.error === 'object' && info.error !== null) {
 		const error: Record<string, unknown> = { ...info.error };
-		delete error.url;
-		delete error.requestBody;
+		scrubDiscordRequest(error);
 		info.error = error;
 	}
 	return info;
