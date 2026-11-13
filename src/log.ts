@@ -44,8 +44,10 @@ const redactDiscordRequests = winston.format((info) => {
 });
 
 /**
- * Where the log file goes, from the environment. Without both, the logger writes to the console only,
- * and main.ts reports what's missing.
+ * Where the log file goes, from the environment.
+ *
+ * @remarks
+ * Without both, the logger writes to the console only, and main.ts reports what's missing.
  */
 const { LOG_DIR: logDir, LOG_FILE: logFile } = process.env;
 
