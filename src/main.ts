@@ -22,7 +22,7 @@ const EXIT_GRACE_MS = 1000;
  */
 async function main(): Promise<void> {
 	const {
-		DB_PATH: dbPath,
+		DB_FILE: dbFile,
 		DISCORD_TOKEN: token,
 		GAME_TIMEZONE: timezone,
 		LOG_DIR: logDir,
@@ -30,11 +30,11 @@ async function main(): Promise<void> {
 	} = process.env;
 	logger.info('Starting Quest Calendars Bot');
 
-	if (!token || !timezone || !dbPath || !logDir || !logFile) {
+	if (!token || !timezone || !dbFile || !logDir || !logFile) {
 		const missing = [
 			!token && 'DISCORD_TOKEN',
 			!timezone && 'GAME_TIMEZONE',
-			!dbPath && 'DB_PATH',
+			!dbFile && 'DB_FILE',
 			!logDir && 'LOG_DIR',
 			!logFile && 'LOG_FILE',
 		].filter(Boolean);
@@ -51,13 +51,13 @@ async function main(): Promise<void> {
 
 	let storage;
 	try {
-		storage = openStorage(dbPath);
+		storage = openStorage(dbFile);
 	} catch (error) {
-		logger.error(`DB_PATH can't be opened: ${dbPath}`, error);
+		logger.error(`DB_FILE can't be opened: ${dbFile}`, error);
 		process.exitCode = 1;
 		return;
 	}
-	logger.info('Opened game state', { from: dbPath });
+	logger.info('Opened game state', { from: dbFile });
 
 	await startBot({ game: createGame({ storage }), token });
 }

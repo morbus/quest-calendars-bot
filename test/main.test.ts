@@ -38,23 +38,23 @@ test('startup fails, naming each missing variable, when none are set', async () 
 	const { code, output } = await start({ LOG_DIR: '', LOG_FILE: '' });
 
 	assert.equal(code, 1);
-	assert.match(output, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE, DB_PATH, LOG_DIR, LOG_FILE/);
+	assert.match(output, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE, DB_FILE, LOG_DIR, LOG_FILE/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
 
-test('startup fails, naming only DB_PATH, when the rest are set', async () => {
+test('startup fails, naming only DB_FILE, when the rest are set', async () => {
 	const { code, output } = await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
 
 	assert.equal(code, 1);
-	assert.match(output, /Missing environment variables: DB_PATH/);
+	assert.match(output, /Missing environment variables: DB_FILE/);
 	assert.doesNotMatch(output, /DISCORD_TOKEN|GAME_TIMEZONE|LOG_DIR|LOG_FILE/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
 
 test('startup fails, naming only LOG_DIR, when the rest are set', async () => {
-	const dbPath = join(await tempDir(), 'game.sqlite');
+	const dbFile = join(await tempDir(), 'game.sqlite');
 
-	const { code, output } = await start({ DB_PATH: dbPath, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC', LOG_DIR: '' });
+	const { code, output } = await start({ DB_FILE: dbFile, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC', LOG_DIR: '' });
 
 	assert.equal(code, 1);
 	assert.match(output, /Missing environment variables: LOG_DIR(?!,)/);
@@ -62,10 +62,10 @@ test('startup fails, naming only LOG_DIR, when the rest are set', async () => {
 });
 
 test('startup fails, naming only LOG_FILE, when the rest are set', async () => {
-	const dbPath = join(await tempDir(), 'game.sqlite');
+	const dbFile = join(await tempDir(), 'game.sqlite');
 
 	const { code, logDir, output } = await start({
-		DB_PATH: dbPath,
+		DB_FILE: dbFile,
 		DISCORD_TOKEN: 'token',
 		GAME_TIMEZONE: 'UTC',
 		LOG_FILE: '',
@@ -79,7 +79,7 @@ test('startup fails, naming only LOG_FILE, when the rest are set', async () => {
 
 test('startup fails when the timezone is not a real one', async () => {
 	const { code, output } = await start({
-		DB_PATH: join(await tempDir(), 'game.sqlite'),
+		DB_FILE: join(await tempDir(), 'game.sqlite'),
 		DISCORD_TOKEN: 'token',
 		GAME_TIMEZONE: 'Mars/Olympus_Mons',
 	});
@@ -97,23 +97,23 @@ test('startup writes its log lines to LOG_FILE in LOG_DIR', async () => {
 	assert.match(log, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE/);
 });
 
-test("startup fails, naming DB_PATH, when DB_PATH can't be opened", async () => {
+test("startup fails, naming DB_FILE, when DB_FILE can't be opened", async () => {
 	const path = join(await tempDir(), 'missing', 'game.sqlite');
 
-	const { code, output } = await start({ DB_PATH: path, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
+	const { code, output } = await start({ DB_FILE: path, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
 
 	assert.equal(code, 1);
-	assert.match(output, /DB_PATH can't be opened: .*missing\/game\.sqlite/);
+	assert.match(output, /DB_FILE can't be opened: .*missing\/game\.sqlite/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
 
-test('startup fails, naming DB_PATH, when DB_PATH is not a database', async () => {
+test('startup fails, naming DB_FILE, when DB_FILE is not a database', async () => {
 	const path = join(await tempDir(), 'notes.txt');
 	await writeFile(path, 'This is not a database.');
 
-	const { code, output } = await start({ DB_PATH: path, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
+	const { code, output } = await start({ DB_FILE: path, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
 
 	assert.equal(code, 1);
-	assert.match(output, /DB_PATH can't be opened: .*notes\.txt/);
+	assert.match(output, /DB_FILE can't be opened: .*notes\.txt/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
