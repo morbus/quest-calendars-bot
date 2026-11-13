@@ -5,7 +5,7 @@
 import { DatabaseSync } from 'node:sqlite';
 
 /**
- * Reads and writes the game state in SQLite. Open it with {@link openStorage}.
+ * Reads and writes the game state in SQLite; open it with {@link openStorage}.
  */
 export type Storage = {
 	/**
