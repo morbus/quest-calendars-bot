@@ -23,11 +23,20 @@ const consoleLine = winston.format.printf(({ timestamp, level, message, stack, .
  *
  * @remarks
  * A reply's URL holds the interaction's token, which lets anyone holding it answer for the bot,
- * and its body holds what only the Player should see.
+ * and its body holds what only the Player should see. Other fields named `url` are kept.
  */
 const dropDiscordRequest = winston.format((info) => {
-	delete info.url;
-	delete info.requestBody;
+	if ('requestBody' in info) {
+		delete info.url;
+		delete info.requestBody;
+	}
+	// Unhandled exceptions and rejections arrive nested under `error`. Copy it rather than change the caller's error.
+	if (typeof info.error === 'object' && info.error !== null && 'requestBody' in info.error) {
+		const error: Record<string, unknown> = { ...info.error };
+		delete error.url;
+		delete error.requestBody;
+		info.error = error;
+	}
 	return info;
 });
 

@@ -30,8 +30,11 @@ async function capture(log: () => void): Promise<string> {
 	return output;
 }
 
-test("a failed Discord reply logs its error without the interaction token or the Player's reply", async () => {
-	const error = new DiscordAPIError(
+/**
+ * A failed reply, as discord.js reports it: its URL holds the interaction token, and its body the Player's reply.
+ */
+function failedReply(): DiscordAPIError {
+	return new DiscordAPIError(
 		{ code: 10062, message: 'Unknown interaction' },
 		10062,
 		404,
@@ -39,6 +42,10 @@ test("a failed Discord reply logs its error without the interaction token or the
 		'https://discord.com/api/v10/webhooks/111/SECRET_INTERACTION_TOKEN/messages/@original',
 		{ body: { content: 'PRIVATE_REPLY_TEXT' } },
 	);
+}
+
+test("a failed Discord reply logs its error without the interaction token or the Player's reply", async () => {
+	const error = failedReply();
 
 	const output = await capture(() => logger.child({ playerId: 'player-1' }).error('Command failed', error));
 
@@ -46,4 +53,24 @@ test("a failed Discord reply logs its error without the interaction token or the
 	assert.match(output, /Unknown interaction/);
 	assert.doesNotMatch(output, /SECRET_INTERACTION_TOKEN/);
 	assert.doesNotMatch(output, /PRIVATE_REPLY_TEXT/);
+});
+
+test('an error nested under `error`, as an unhandled rejection logs it, also loses the token and the reply', async () => {
+	const output = await capture(() => logger.error('Unhandled rejection', { error: failedReply() }));
+
+	assert.match(output, /Unhandled rejection/);
+	assert.doesNotMatch(output, /SECRET_INTERACTION_TOKEN/);
+	assert.doesNotMatch(output, /PRIVATE_REPLY_TEXT/);
+});
+
+test('a log line that is not a failed Discord request keeps its url', async () => {
+	const output = await capture(() => logger.info('Fetched a page', { url: 'https://example.com/page' }));
+
+	assert.match(output, /https:\/\/example\.com\/page/);
+});
+
+test('a nested error that is not a failed Discord request keeps its url', async () => {
+	const output = await capture(() => logger.error('Fetch failed', { error: { url: 'https://example.com/page' } }));
+
+	assert.match(output, /https:\/\/example\.com\/page/);
 });
