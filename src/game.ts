@@ -55,7 +55,7 @@ export type Game = {
 export function createGame({ storage }: { storage: Storage }): Game {
 	return {
 		handle(_playerId, _serverId, _input, _now) {
-			return storage.transaction(() => ({ reply: { sections: ['No Quests available'] } }));
+			return storage.transaction(() => ({ reply: { sections: ['Quests are coming soon.'] } }));
 		},
 	};
 }

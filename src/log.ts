@@ -1,42 +1,8 @@
 /**
- * Colored log lines for the console, and, once {@link logToDir} is called, JSON lines in a rotated
- * quest-calendars-bot.log.
+ * Colored log lines for the console, and JSON lines in a rotated LOG_FILE in LOG_DIR.
  */
 
-import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import winston from 'winston';
-
-/**
- * The name of the current log file in the log directory.
- */
-const LOG_FILE = 'quest-calendars-bot.log';
-
-/**
- * Creates `dir` if needed, and checks that the logs can be written there and the directory entered.
- *
- * @remarks
- * Run before the file log is added, so a bad directory or log file stops startup with its name,
- * instead of crashing on the first write or leaving the log file silently empty.
- *
- * @throws When `dir` can't be created, entered, or written to, or it holds a log file that can't be written to.
- */
-function prepareLogDir(dir: string): void {
-	try {
-		mkdirSync(dir, { recursive: true });
-		accessSync(dir, constants.W_OK | constants.X_OK);
-	} catch (error) {
-		throw new Error(`LOG_DIR is not a directory that can be written to: ${dir}`, { cause: error });
-	}
-
-	const file = join(dir, LOG_FILE);
-	if (!existsSync(file)) return;
-	try {
-		accessSync(file, constants.W_OK);
-	} catch (error) {
-		throw new Error(`LOG_DIR has a log file that can't be written to: ${file}`, { cause: error });
-	}
-}
 
 /**
  * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
@@ -78,6 +44,12 @@ const redactDiscordRequests = winston.format((info) => {
 });
 
 /**
+ * Where the log file goes, from the environment. Without both, the logger writes to the console only,
+ * and main.ts reports what's missing.
+ */
+const { LOG_DIR: logDir, LOG_FILE: logFile } = process.env;
+
+/**
  * The bot's logger.
  *
  * @remarks
@@ -99,17 +71,11 @@ export const logger = winston.createLogger({
 	],
 });
 
-/**
- * Also writes every log line to the rotated log file in `dir`, from now on.
- *
- * @throws When `dir` can't be created, entered, or written to, or it holds a log file that can't be written to.
- */
-export function logToDir(dir: string): void {
-	prepareLogDir(dir);
+if (logDir && logFile) {
 	logger.add(
 		new winston.transports.File({
-			dirname: dir,
-			filename: LOG_FILE,
+			dirname: logDir,
+			filename: logFile,
 			maxsize: 5 * 1024 * 1024,
 			maxFiles: 6,
 			tailable: true,

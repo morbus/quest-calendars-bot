@@ -9,16 +9,16 @@ import { openStorage } from '../src/storage.ts';
 const NOW = new Date('2026-11-13T09:00:00Z');
 
 /**
- * A Game with in-memory storage and no Quests.
+ * A Game with in-memory storage.
  */
 function newGame(): Game {
 	return createGame({ storage: openStorage(':memory:') });
 }
 
-test('/quest start says no Quests are available', () => {
+test('/quest start says Quests are coming soon', () => {
 	const game = newGame();
 
 	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
 
-	assert.deepEqual(reply.sections, ['No Quests available']);
+	assert.deepEqual(reply.sections, ['Quests are coming soon.']);
 });
