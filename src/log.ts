@@ -18,13 +18,13 @@ const LOG_DIR = process.env.LOG_DIR || fileURLToPath(new URL('../logs/', import.
 const LOG_FILE = 'quest-calendars-bot.log';
 
 /**
- * Creates `dir` if needed, and checks that the logs can be written there.
+ * Creates `dir` if needed, and checks that the logs can be written there and the directory entered.
  *
  * @remarks
  * Run before the logger exists, so a bad directory or log file stops startup with its name,
  * instead of crashing on the first write or leaving the log file silently empty.
  *
- * @throws When `dir` can't be created or written to, or it holds a log file that can't be written to.
+ * @throws When `dir` can't be created, entered, or written to, or it holds a log file that can't be written to.
  */
 function prepareLogDir(dir: string): void {
 	try {

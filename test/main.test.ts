@@ -15,7 +15,7 @@ const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 /**
  * Skips a permissions test when running as root, which can read, write, and enter anything regardless of its mode.
  */
-const asAnotherUser = { skip: process.getuid?.() === 0 };
+const skipAsRoot = { skip: process.getuid?.() === 0 };
 
 /**
  * Starts the bot with only `env` set, waits for it to exit, and returns its exit code, every line it printed,
@@ -74,7 +74,7 @@ test('startup fails, naming LOG_DIR, when LOG_DIR is a file', async () => {
 	assert.match(output, /LOG_DIR is not a directory that can be written to: .*not-a-directory/);
 });
 
-test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', asAnotherUser, async () => {
+test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', skipAsRoot, async () => {
 	const dir = join(await tempDir(), 'read-only');
 	await mkdir(dir);
 	await chmod(dir, 0o555);
@@ -85,7 +85,7 @@ test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', asAnotherUser, 
 	assert.match(output, /LOG_DIR is not a directory that can be written to: .*read-only/);
 });
 
-test('startup fails, naming the file, when the log file in LOG_DIR is read-only', asAnotherUser, async () => {
+test('startup fails, naming the file, when the log file in LOG_DIR is read-only', skipAsRoot, async () => {
 	const dir = await tempDir();
 	const file = join(dir, 'quest-calendars-bot.log');
 	await writeFile(file, '');
@@ -97,7 +97,7 @@ test('startup fails, naming the file, when the log file in LOG_DIR is read-only'
 	assert.match(output, /LOG_DIR has a log file that can't be written to: .*quest-calendars-bot\.log/);
 });
 
-test("startup fails, naming LOG_DIR, when LOG_DIR can't be entered", asAnotherUser, async () => {
+test("startup fails, naming LOG_DIR, when LOG_DIR can't be entered", skipAsRoot, async () => {
 	const dir = join(await tempDir(), 'no-entry');
 	await mkdir(dir);
 	await chmod(dir, 0o600);
