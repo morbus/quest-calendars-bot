@@ -4,11 +4,7 @@ import { PassThrough } from 'node:stream';
 import { setImmediate } from 'node:timers/promises';
 import { DiscordAPIError, RateLimitError } from 'discord.js';
 import winston from 'winston';
-import { tempDir } from './temp-dir.ts';
-
-// Keep this test's log lines out of the project's logs/.
-process.env.LOG_DIR = await tempDir();
-const { logger } = await import('../src/log.ts');
+import { logger } from '../src/log.ts';
 
 /**
  * Logs through the bot's logger and returns every line it wrote, as the transports see them.

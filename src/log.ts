@@ -1,19 +1,14 @@
 /**
- * Colored log lines for the console, and JSON lines in a rotated quest-calendars-bot.log.
+ * Colored log lines for the console, and, once {@link logToDir} is called, JSON lines in a rotated
+ * quest-calendars-bot.log.
  */
 
 import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import winston from 'winston';
 
 /**
- * Where the log files go: the LOG_DIR environment variable, or logs/ in the project root.
- */
-const LOG_DIR = process.env.LOG_DIR || fileURLToPath(new URL('../logs/', import.meta.url));
-
-/**
- * The name of the current log file in {@link LOG_DIR}.
+ * The name of the current log file in the log directory.
  */
 const LOG_FILE = 'quest-calendars-bot.log';
 
@@ -21,7 +16,7 @@ const LOG_FILE = 'quest-calendars-bot.log';
  * Creates `dir` if needed, and checks that the logs can be written there and the directory entered.
  *
  * @remarks
- * Run before the logger exists, so a bad directory or log file stops startup with its name,
+ * Run before the file log is added, so a bad directory or log file stops startup with its name,
  * instead of crashing on the first write or leaving the log file silently empty.
  *
  * @throws When `dir` can't be created, entered, or written to, or it holds a log file that can't be written to.
@@ -42,8 +37,6 @@ function prepareLogDir(dir: string): void {
 		throw new Error(`LOG_DIR has a log file that can't be written to: ${file}`, { cause: error });
 	}
 }
-
-prepareLogDir(LOG_DIR);
 
 /**
  * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
@@ -103,8 +96,19 @@ export const logger = winston.createLogger({
 			handleExceptions: true,
 			handleRejections: true,
 		}),
+	],
+});
+
+/**
+ * Also writes every log line to the rotated log file in `dir`, from now on.
+ *
+ * @throws When `dir` can't be created, entered, or written to, or it holds a log file that can't be written to.
+ */
+export function logToDir(dir: string): void {
+	prepareLogDir(dir);
+	logger.add(
 		new winston.transports.File({
-			dirname: LOG_DIR,
+			dirname: dir,
 			filename: LOG_FILE,
 			maxsize: 5 * 1024 * 1024,
 			maxFiles: 6,
@@ -113,5 +117,5 @@ export const logger = winston.createLogger({
 			handleExceptions: true,
 			handleRejections: true,
 		}),
-	],
-});
+	);
+}

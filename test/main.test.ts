@@ -32,24 +32,29 @@ async function start(env: Record<string, string>): Promise<{ code: number | null
 	return { code, logDir, output };
 }
 
-test('startup fails, naming each missing variable, when the token and timezone are missing', async () => {
-	const { code, output } = await start({});
+test('startup fails, naming each missing variable, when none are set', async () => {
+	const { code, output } = await start({ LOG_DIR: '' });
 
 	assert.equal(code, 1);
-	assert.match(output, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE/);
+	assert.match(output, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE, DB_PATH, LOG_DIR/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
 
-test('startup fails, naming only the timezone, when the token is set', async () => {
-	const { code, output } = await start({ DISCORD_TOKEN: 'token' });
+test('startup fails, naming only DB_PATH, when the rest are set', async () => {
+	const { code, output } = await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
 
 	assert.equal(code, 1);
-	assert.match(output, /Missing environment variables: GAME_TIMEZONE/);
-	assert.doesNotMatch(output, /DISCORD_TOKEN/);
+	assert.match(output, /Missing environment variables: DB_PATH/);
+	assert.doesNotMatch(output, /DISCORD_TOKEN|GAME_TIMEZONE|LOG_DIR/);
+	assert.doesNotMatch(output, /Opened game state/);
 });
 
 test('startup fails when the timezone is not a real one', async () => {
-	const { code, output } = await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'Mars/Olympus_Mons' });
+	const { code, output } = await start({
+		DB_PATH: join(await tempDir(), 'game.sqlite'),
+		DISCORD_TOKEN: 'token',
+		GAME_TIMEZONE: 'Mars/Olympus_Mons',
+	});
 
 	assert.equal(code, 1);
 	assert.match(output, /GAME_TIMEZONE is not a valid timezone: Mars\/Olympus_Mons/);
@@ -115,5 +120,15 @@ test("startup fails, naming DB_PATH, when DB_PATH can't be opened", async () => 
 
 	assert.equal(code, 1);
 	assert.match(output, /DB_PATH can't be opened: .*missing\/game\.sqlite/);
+	assert.doesNotMatch(output, /Opened game state/);
+});
+
+test('startup fails, naming only LOG_DIR, when the rest are set', async () => {
+	const dbPath = join(await tempDir(), 'game.sqlite');
+
+	const { code, output } = await start({ DB_PATH: dbPath, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC', LOG_DIR: '' });
+
+	assert.equal(code, 1);
+	assert.match(output, /Missing environment variables: LOG_DIR/);
 	assert.doesNotMatch(output, /Opened game state/);
 });

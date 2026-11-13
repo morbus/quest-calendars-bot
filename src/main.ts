@@ -4,15 +4,8 @@
 
 import { startBot } from './discord.ts';
 import { createGame } from './game.ts';
-import { logger } from './log.ts';
+import { logger, logToDir } from './log.ts';
 import { openStorage } from './storage.ts';
-import { fileURLToPath } from 'node:url';
-
-/**
- * The SQLite file that holds the game state: the DB_PATH environment variable,
- * or quest-calendars-bot.sqlite in the project root.
- */
-const DB_PATH = process.env.DB_PATH || fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.meta.url));
 
 /**
  * Starts the bot.
@@ -23,12 +16,19 @@ const DB_PATH = process.env.DB_PATH || fileURLToPath(new URL('../quest-calendars
  * to exit shortly after, in case something such as the Discord client still holds Node open.
  */
 async function main(): Promise<void> {
+	const { DB_PATH: dbPath, DISCORD_TOKEN: token, GAME_TIMEZONE: timezone, LOG_DIR: logDir } = process.env;
+
+	// Start the file log first, so every line after this reaches it.
+	if (logDir) logToDir(logDir);
 	logger.info('Starting Quest Calendars Bot');
 
-	const token = process.env.DISCORD_TOKEN;
-	const timezone = process.env.GAME_TIMEZONE;
-	if (!token || !timezone) {
-		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE'].filter(Boolean);
+	if (!token || !timezone || !dbPath || !logDir) {
+		const missing = [
+			!token && 'DISCORD_TOKEN',
+			!timezone && 'GAME_TIMEZONE',
+			!dbPath && 'DB_PATH',
+			!logDir && 'LOG_DIR',
+		].filter(Boolean);
 		logger.error(`Missing environment variables: ${missing.join(', ')}`);
 		process.exitCode = 1;
 		return;
@@ -41,13 +41,13 @@ async function main(): Promise<void> {
 
 	let storage;
 	try {
-		storage = openStorage(DB_PATH);
+		storage = openStorage(dbPath);
 	} catch (error) {
-		logger.error(`DB_PATH can't be opened: ${DB_PATH}`, error);
+		logger.error(`DB_PATH can't be opened: ${dbPath}`, error);
 		process.exitCode = 1;
 		return;
 	}
-	logger.info('Opened game state', { path: DB_PATH });
+	logger.info('Opened game state', { path: dbPath });
 
 	await startBot({ game: createGame({ storage }), token });
 }
