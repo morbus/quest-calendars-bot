@@ -34,8 +34,16 @@ export function openStorage(path: string): Storage {
 	const db = new DatabaseSync(path, { timeout: BUSY_TIMEOUT_MS });
 	// Opening neither reads nor writes the file, so rewrite its version number unchanged now: a file
 	// that isn't a database, or can't be written to, fails here instead of on the first command.
-	const { user_version: version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
-	db.exec(`PRAGMA user_version = ${version}`);
+	// The lock keeps another process from changing the version between the read and the write.
+	db.exec('BEGIN IMMEDIATE');
+	try {
+		const { user_version: version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
+		db.exec(`PRAGMA user_version = ${version}`);
+		db.exec('COMMIT');
+	} catch (error) {
+		if (db.isTransaction) db.exec('ROLLBACK');
+		throw error;
+	}
 
 	return {
 		transaction(work) {
