@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { readFile } from 'node:fs/promises';
+import { mkdtempDisposable, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tempDir } from './temp-dir.ts';
 
 /**
  * The CLI entry point, as `npm start` runs it.
@@ -59,7 +60,8 @@ test("startup writes its log lines to the project's logs/quest-calendars-bot.log
 	// A timezone no other run uses, so this run's line can be found among every earlier one.
 	const timezone = `Mars/Test_${process.pid}_${Date.now()}`;
 
-	await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: timezone }, await tempDir());
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: timezone }, dir.path);
 
 	// A missing file reads as empty, so the assertion below reports it.
 	const log = await readFile(LOG_FILE, 'utf8').catch(() => '');
