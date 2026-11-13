@@ -11,13 +11,24 @@ import winston from 'winston';
  */
 const LOG_DIR = process.env.LOG_DIR || fileURLToPath(new URL('../logs/', import.meta.url));
 
-// Check the directory now, so a bad one stops startup with its name instead of crashing on the first write.
-try {
-	mkdirSync(LOG_DIR, { recursive: true });
-	accessSync(LOG_DIR, constants.W_OK);
-} catch (error) {
-	throw new Error(`LOG_DIR is not a directory that can be written to: ${LOG_DIR}`, { cause: error });
+/**
+ * Creates `dir` if needed, and checks that the logs can be written there.
+ *
+ * @remarks
+ * Run before the logger exists, so a bad directory stops startup with its name instead of crashing on the first write.
+ *
+ * @throws When `dir` can't be created or written to.
+ */
+function prepareLogDir(dir: string): void {
+	try {
+		mkdirSync(dir, { recursive: true });
+		accessSync(dir, constants.W_OK);
+	} catch (error) {
+		throw new Error(`LOG_DIR is not a directory that can be written to: ${dir}`, { cause: error });
+	}
 }
+
+prepareLogDir(LOG_DIR);
 
 /**
  * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
@@ -47,7 +58,7 @@ function scrubDiscordRequest(fields: Record<string, unknown>): void {
  * A reply's URL holds the interaction's token, which lets anyone holding it answer for the bot,
  * and its body holds what only the Player should see. The rest of the URL is kept, for debugging.
  */
-const dropDiscordRequest = winston.format((info) => {
+const redactDiscordRequests = winston.format((info) => {
 	scrubDiscordRequest(info);
 	// Unhandled exceptions and rejections arrive nested under `error`. Copy it rather than change the caller's error.
 	if (typeof info.error === 'object' && info.error !== null) {
@@ -68,7 +79,7 @@ export const logger = winston.createLogger({
 	level: 'info',
 	format: winston.format.combine(
 		winston.format.errors({ stack: true }),
-		dropDiscordRequest(),
+		redactDiscordRequests(),
 		winston.format.timestamp(),
 	),
 	transports: [
