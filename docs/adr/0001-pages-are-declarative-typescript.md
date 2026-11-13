@@ -1,6 +1,6 @@
 # Pages are declarative TypeScript files
 
-Each Quest is a directory, and each Page in it is a `.ts` file that exports a tree built from helper functions (`page()`, `choice()`, `roll()`, `upTo()`/`between()`/`atLeast()`, Effects such as `lose()`, combat blocks), not a data file. Pages branch deeply: Choices, rolls nested inside Outcomes, success counters, and Notes that later Pages check. TypeScript gives authors autocomplete and type errors for unknown stats, items, and Abilities.
+Each Quest is a directory, and each Page in it is a `.ts` file that exports a tree built from helper functions (`page()`, `choice()`, `roll()`, `upTo()`/`between()`/`atLeast()`, Effects such as `lose()`, combat blocks), not a data file. Pages branch deeply: Choices, rolls nested inside Outcomes, success counters, and Notes that later Pages check. TypeScript gives authors autocomplete and type errors for unknown Stats, Traits, Abilities, equipment, etc.
 
 ## Considered options
 
