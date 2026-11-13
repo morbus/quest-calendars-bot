@@ -1,14 +1,14 @@
 /**
- * Colored log lines for the console, and JSON lines in a rotated logs/quest-calendars-bot.log.
+ * Colored log lines for the console, and JSON lines in a rotated quest-calendars-bot.log.
  */
 
 import { fileURLToPath } from 'node:url';
 import winston from 'winston';
 
 /**
- * Where the log files go, typically logs/ in the project root.
+ * Where the log files go: the LOG_DIR environment variable, or logs/ in the project root.
  */
-const LOG_DIR = fileURLToPath(new URL('../logs/', import.meta.url));
+const LOG_DIR = process.env.LOG_DIR || fileURLToPath(new URL('../logs/', import.meta.url));
 
 /**
  * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
