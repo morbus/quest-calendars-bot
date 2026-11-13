@@ -22,11 +22,7 @@ const COMMANDS = [
 	new SlashCommandBuilder()
 		.setName('quest')
 		.setDescription('Play your quests and advance through solo, dice-driven role-playing.')
-		.addSubcommand((subcommand) =>
-			subcommand
-				.setName('start')
-				.setDescription('Start a new quest.')
-		),
+		.addSubcommand((subcommand) => subcommand.setName('start').setDescription('Start a new quest.')),
 ].map((builder) =>
 	builder
 		.setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
