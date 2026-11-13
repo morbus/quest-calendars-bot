@@ -1,5 +1,6 @@
 /**
- * Colored log lines for the console, and JSON lines in a rotated LOG_FILE in LOG_DIR.
+ * Colored log lines for the console, and JSON lines in a rotated logs/quest-calendars-bot.log, relative to
+ * where the bot runs from.
  */
 
 import winston from 'winston';
@@ -44,14 +45,6 @@ const redactDiscordRequests = winston.format((info) => {
 });
 
 /**
- * Where the log file goes, from the environment.
- *
- * @remarks
- * Without both, the logger writes to the console only, and main.ts reports what's missing.
- */
-const { LOG_DIR: logDir, LOG_FILE: logFile } = process.env;
-
-/**
  * The bot's logger.
  *
  * @remarks
@@ -70,14 +63,8 @@ export const logger = winston.createLogger({
 			handleExceptions: true,
 			handleRejections: true,
 		}),
-	],
-});
-
-if (logDir && logFile) {
-	logger.add(
 		new winston.transports.File({
-			dirname: logDir,
-			filename: logFile,
+			filename: 'logs/quest-calendars-bot.log',
 			maxsize: 5 * 1024 * 1024,
 			maxFiles: 6,
 			tailable: true,
@@ -85,5 +72,5 @@ if (logDir && logFile) {
 			handleExceptions: true,
 			handleRejections: true,
 		}),
-	);
-}
+	],
+});

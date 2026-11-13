@@ -21,23 +21,11 @@ const EXIT_GRACE_MS = 1000;
  * to exit shortly after, in case something such as the Discord client still holds Node open.
  */
 async function main(): Promise<void> {
-	const {
-		DB_FILE: dbFile,
-		DISCORD_TOKEN: token,
-		GAME_TIMEZONE: timezone,
-		LOG_DIR: logDir,
-		LOG_FILE: logFile,
-	} = process.env;
+	const { DB_FILE: dbFile, DISCORD_TOKEN: token, GAME_TIMEZONE: timezone } = process.env;
 	logger.info('Starting Quest Calendars Bot');
 
-	if (!token || !timezone || !dbFile || !logDir || !logFile) {
-		const missing = [
-			!token && 'DISCORD_TOKEN',
-			!timezone && 'GAME_TIMEZONE',
-			!dbFile && 'DB_FILE',
-			!logDir && 'LOG_DIR',
-			!logFile && 'LOG_FILE',
-		].filter(Boolean);
+	if (!token || !timezone || !dbFile) {
+		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE', !dbFile && 'DB_FILE'].filter(Boolean);
 		logger.error(`Missing environment variables: ${missing.join(', ')}`);
 		process.exitCode = 1;
 		return;
