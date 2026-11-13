@@ -21,8 +21,11 @@ import { logger } from './log.ts';
 const COMMANDS = [
 	new SlashCommandBuilder()
 		.setName('quest')
-		.setDescription('Play your quests.')
-		.addSubcommand((subcommand) => subcommand.setName('start').setDescription('Start a new quest.')),
+		.setDescription('Play your quests and advance through solo, dice-driven role-playing.')
+		.addSubcommand((subcommand) => subcommand
+			.setName('start')
+			.setDescription('Start a new quest.')
+		),
 ].map((builder) =>
 	builder
 		.setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
@@ -41,11 +44,10 @@ export async function startBot({ game, token }: { game: Game; token: string }): 
 	client.once(Events.ClientReady, async (ready) => {
 		logger.info('Logged in to Discord', { as: ready.user.tag });
 		try {
-			// Registering globally replaces whatever was registered before.
 			await ready.application.commands.set(COMMANDS);
 			logger.info('Registered global commands', { commands: COMMANDS.map((command) => `/${command.name}`) });
 		} catch (error) {
-			logger.error('Could not register commands', error);
+			logger.error('Could not register global commands', error);
 		}
 	});
 	client.on(Events.Error, (error) => logger.error('Discord client error', error));
@@ -89,7 +91,7 @@ async function handle(interaction: ChatInputCommandInteraction, game: Game): Pro
 }
 
 /**
- * Turns a slash command's full name, such as "quest start", into the Game's {@link Input}.
+ * Turns a slash command, such as "quest start", into the Game's {@link Input}.
  *
  * @throws When it isn't a command the bot registers.
  */
