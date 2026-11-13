@@ -1,15 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { setImmediate } from 'node:timers/promises';
 import { DiscordAPIError, RateLimitError } from 'discord.js';
 import winston from 'winston';
+import { tempDir } from './temp-dir.ts';
 
 // Keep this test's log lines out of the project's logs/.
-process.env.LOG_DIR = await mkdtemp(join(tmpdir(), 'quest-calendars-bot-'));
+process.env.LOG_DIR = await tempDir();
 const { logger } = await import('../src/log.ts');
 
 /**
@@ -109,4 +107,21 @@ test('a null error stays null', async () => {
 	const output = await capture(() => logger.error('Nothing thrown', { error: null }));
 
 	assert.match(output, /"error":null/);
+});
+
+test("a failed first reply logs its error without the interaction token or the Player's reply", async () => {
+	const error = new DiscordAPIError(
+		{ code: 10062, message: 'Unknown interaction' },
+		10062,
+		404,
+		'POST',
+		'https://discord.com/api/v10/interactions/111/SECRET_INTERACTION_TOKEN/callback',
+		{ body: { data: { content: 'PRIVATE_REPLY_TEXT' }, type: 4 } },
+	);
+
+	const output = await capture(() => logger.error('Command failed', error));
+
+	assert.match(output, /api\/v10\/interactions\/111\/:token\/callback/);
+	assert.doesNotMatch(output, /SECRET_INTERACTION_TOKEN/);
+	assert.doesNotMatch(output, /PRIVATE_REPLY_TEXT/);
 });

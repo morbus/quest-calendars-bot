@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from './temp-dir.ts';
 
 /**
  * The CLI entry point, as `npm start` runs it.
@@ -17,7 +17,7 @@ const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
  * and the temporary directory it logged to.
  */
 async function start(env: Record<string, string>): Promise<{ code: number | null; logDir: string; output: string }> {
-	const logDir = await mkdtemp(join(tmpdir(), 'quest-calendars-bot-'));
+	const logDir = await tempDir();
 	const child = spawn(process.execPath, [MAIN], { env: { LOG_DIR: logDir, PATH: process.env.PATH ?? '', ...env } });
 	let output = '';
 	child.stdout.on('data', (chunk) => (output += chunk));
@@ -60,7 +60,7 @@ test('startup writes its log file to LOG_DIR', async () => {
 });
 
 test('startup fails, naming LOG_DIR, when LOG_DIR is a file', async () => {
-	const file = join(await mkdtemp(join(tmpdir(), 'quest-calendars-bot-')), 'not-a-directory');
+	const file = join(await tempDir(), 'not-a-directory');
 	await writeFile(file, '');
 
 	const { code, output } = await start({ LOG_DIR: file });
@@ -69,8 +69,9 @@ test('startup fails, naming LOG_DIR, when LOG_DIR is a file', async () => {
 	assert.match(output, /LOG_DIR is not a directory that can be written to: .*not-a-directory/);
 });
 
-test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', async () => {
-	const dir = join(await mkdtemp(join(tmpdir(), 'quest-calendars-bot-')), 'read-only');
+// Root can write to a read-only directory, so this can only be checked as another user.
+test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', { skip: process.getuid?.() === 0 }, async () => {
+	const dir = join(await tempDir(), 'read-only');
 	await mkdir(dir);
 	await chmod(dir, 0o555);
 
