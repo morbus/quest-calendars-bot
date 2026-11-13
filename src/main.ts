@@ -10,9 +10,10 @@ import { openStorage } from './storage.ts';
 import { fileURLToPath } from 'node:url';
 
 /**
- * The SQLite file that holds the game state, in the project root.
+ * The SQLite file that holds the game state: the DB_PATH environment variable,
+ * or quest-calendars-bot.sqlite in the project root.
  */
-const DB_PATH = fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.meta.url));
+const DB_PATH = process.env.DB_PATH || fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.meta.url));
 
 /**
  * Starts the bot.
@@ -39,7 +40,14 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	const storage = openStorage(DB_PATH);
+	let storage;
+	try {
+		storage = openStorage(DB_PATH);
+	} catch (error) {
+		logger.error(`DB_PATH can't be opened: ${DB_PATH}`, error);
+		process.exitCode = 1;
+		return;
+	}
 	logger.info('Opened game state', { path: DB_PATH });
 
 	await startBot({ game: createGame({ dice: randomDice, storage, timezone }), token });

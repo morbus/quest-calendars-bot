@@ -107,3 +107,13 @@ test("startup fails, naming LOG_DIR, when LOG_DIR can't be entered", skipAsRoot,
 	assert.equal(code, 1);
 	assert.match(output, /LOG_DIR is not a directory that can be written to: .*no-entry/);
 });
+
+test("startup fails, naming DB_PATH, when DB_PATH can't be opened", async () => {
+	const path = join(await tempDir(), 'missing', 'game.sqlite');
+
+	const { code, output } = await start({ DB_PATH: path, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
+
+	assert.equal(code, 1);
+	assert.match(output, /DB_PATH can't be opened: .*missing\/game\.sqlite/);
+	assert.doesNotMatch(output, /Opened game state/);
+});
