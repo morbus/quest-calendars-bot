@@ -2,7 +2,6 @@
  * Start the bot with `npm start` using `.env` variables.
  */
 
-import { randomDice } from './dice.ts';
 import { startBot } from './discord.ts';
 import { createGame } from './game.ts';
 import { logger } from './log.ts';
@@ -50,7 +49,7 @@ async function main(): Promise<void> {
 	}
 	logger.info('Opened game state', { path: DB_PATH });
 
-	await startBot({ game: createGame({ dice: randomDice, storage, timezone }), token });
+	await startBot({ game: createGame({ storage }), token });
 }
 
 /**

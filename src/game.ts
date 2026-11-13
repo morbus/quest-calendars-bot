@@ -1,5 +1,5 @@
 /**
- * The game rules: turns a Player's Input into a Reply and any Announcements.
+ * The game rules: turns a Player's Input into a Reply.
  */
 
 import type { Storage } from './storage.ts';
@@ -8,16 +8,6 @@ import type { Storage } from './storage.ts';
  * Something a Player did, stripped of anything Discord-specific.
  */
 export type Input = { command: 'quest start' };
-
-/**
- * A public, spoiler-free note that a Player finished a Page.
- */
-export type Announcement = {
-	/**
-	 * What the Announcement says.
-	 */
-	text: string;
-};
 
 /**
  * What an Input shows the Player who sent it.
@@ -37,30 +27,9 @@ export type Reply = {
  */
 export type Result = {
 	/**
-	 * The Announcements to post: at most one, when the Input finished a Page.
-	 */
-	announcements: Announcement[];
-
-	/**
 	 * What the Player sees.
 	 */
 	reply: Reply;
-};
-
-/**
- * Rolls dice.
- *
- * @remarks
- * Production rolls at random, and tests script the rolls.
- */
-export type Dice = {
-	/**
-	 * Rolls one die.
-	 *
-	 * @param sides - How many sides the die has, such as 20 for a d20.
-	 * @returns A whole number from 1 to `sides`.
-	 */
-	roll(sides: number): number;
 };
 
 /**
@@ -81,17 +50,12 @@ export type Game = {
 /**
  * Creates the Game.
  *
- * @param dice - Rolls every die the Game needs.
  * @param storage - Holds every Player's Quests and Sheets.
- * @param timezone - The IANA timezone whose midnight starts each Game Day.
- *
- * @remarks
- * Nothing rolls dice or counts Game Days yet, so `dice` and `timezone` wait for the rules that need them.
  */
-export function createGame({ storage }: { dice: Dice; storage: Storage; timezone: string }): Game {
+export function createGame({ storage }: { storage: Storage }): Game {
 	return {
 		handle(_playerId, _serverId, _input, _now) {
-			return storage.transaction(() => ({ announcements: [], reply: { sections: ['No Quests available'] } }));
+			return storage.transaction(() => ({ reply: { sections: ['No Quests available'] } }));
 		},
 	};
 }
