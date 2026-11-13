@@ -1,4 +1,4 @@
-# The Daily Quest
+# GLOSSARY.md
 
 A Discord game in which **Players** advance through solo, dice-driven role-playing **Quests** one **Page** per day.
 
