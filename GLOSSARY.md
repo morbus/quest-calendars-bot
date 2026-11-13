@@ -43,9 +43,14 @@ uses a limited item to take one at the start or end of a **Page**. It refills He
 _Avoid_: Camp, long rest, recovery.
 
 **Sheet**:
-The current state of one **Player**'s **Character** in one **Quest**:
-**Stats**, **Traits**, **Abilities**, currency, equipment, items, and conditions.
+The current state of one **Player**'s **Character** in one **Quest**: **Stats**,
+**Traits**, **Abilities**, **Currency**, equipment, items, and conditions.
 _Avoid_: Character sheet, profile.
+
+**Currency**:
+The one kind of money a **Quest** uses, named by that **Quest**
+(gold, scrap), and can go negative only as debt from a required payment.
+_Avoid_: Coins, money.
 
 **Action**:
 One thing the **Player** does on a **Page**, usually a die roll plus
@@ -59,7 +64,7 @@ roll falls in: prose plus **Effects**, and sometimes further **Actions** or **Ch
 _Avoid_: Resolution, result.
 
 **Effect**:
-One change an **Outcome** makes to the **Sheet** or to later rolls, such as losing Health, gaining currency
+One change an **Outcome** makes to the **Sheet** or to later rolls, such as losing Health, gaining **Currency**
 or an item, a bonus on the next **Action** or the next **Page**, or a **Note**. "Tomorrow" in **Page** text
 means the **Player**'s next **Page** in that **Quest**, not the next **Game Day**.
 _Avoid_: Consequence, modifier.
@@ -83,15 +88,19 @@ it holds at most 14, and days beyond that do not add to it.
 _Avoid_: Catch-up, missed days.
 
 **Announcement**:
-A public, spoiler-free note in a Discord channel that a **Player** has finished
+A public, spoiler-free note in an **Announcement Channel** that a **Player** has finished
 a **Page**: the **Page**'s **Teaser** plus a tally of the **Effects** they received.
+
+**Announcement Channel**:
+The one channel in a Discord server where **Announcements** are posted, chosen
+by that server's admins. A server with none chosen receives no **Announcements**.
 
 **Teaser**:
 A one-line, spoiler-free summary of a **Page**, written by its author for **Announcements**.
 
 **Rule Module**:
-An optional set of game mechanics, such as the Sunday Lottery, Minions, or
-Crafting, that a **Quest** turns on; the core rules apply to every **Quest**.
+An optional set of game mechanics, such as the Sunday Lottery, Minions, or Crafting, that
+a **Quest** turns on; the core rules, including **Currency**, apply to every **Quest**.
 
 ## Relationships
 
@@ -101,3 +110,4 @@ Crafting, that a **Quest** turns on; the core rules apply to every **Quest**.
 - A **Quest** contains many **Pages** in a fixed order.
 - Each **Game Day** adds one **Page** to the **Player**'s **Backlog** for each **Quest** they are playing, up to 14.
 - Finishing a **Page** produces one **Announcement**; the **Page**'s content is visible only to that **Player**.
+- An **Announcement** is posted in the **Announcement Channel** of every Discord server the **Player** is a member of that has one.
