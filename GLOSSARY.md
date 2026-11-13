@@ -20,7 +20,7 @@ The **Quests** a **Player** has earned in a **Story** but not yet played; it hol
 _Avoid_: Catch-up, missed days
 
 **Character**:
-A playable persona defined by a **Story**, with starting traits, stats and **Abilities**, such as Ivy Bushtail or SD-247.
+A playable persona defined by a **Story**, with starting traits, stats, and **Abilities**, such as Ivy Bushtail or SD-247.
 _Avoid_: Hero, villain (as a general term), avatar
 
 **Choice**:
@@ -50,10 +50,10 @@ _Avoid_: Page, day, entry
 The calendar day, rolling over at midnight in the game's single timezone, on which a **Player** earns one more **Quest** in each **Story** they are playing.
 
 **Rule Module**:
-An optional set of game mechanics, such as Minions, Crafting or the Sunday Lottery, that a **Story** turns on; the core rules apply to every **Story**.
+An optional set of game mechanics, such as Minions, Crafting, or the Sunday Lottery, that a **Story** turns on; the core rules apply to every **Story**.
 
 **Sheet**:
-The current state of one **Player**'s **Character** in one **Story**: traits, stats, currency, items, equipment and conditions.
+The current state of one **Player**'s **Character** in one **Story**: traits, stats, currency, items, equipment, and conditions.
 _Avoid_: Character sheet, villain sheet, profile
 
 **Story**:
