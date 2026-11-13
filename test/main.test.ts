@@ -13,6 +13,11 @@ import { tempDir } from './temp-dir.ts';
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 
 /**
+ * Skips a permissions test when running as root, which can read, write, and enter anything regardless of its mode.
+ */
+const asAnotherUser = { skip: process.getuid?.() === 0 };
+
+/**
  * Starts the bot with only `env` set, waits for it to exit, and returns its exit code, every line it printed,
  * and the temporary directory it logged to.
  */
@@ -69,8 +74,7 @@ test('startup fails, naming LOG_DIR, when LOG_DIR is a file', async () => {
 	assert.match(output, /LOG_DIR is not a directory that can be written to: .*not-a-directory/);
 });
 
-// Root can write to a read-only directory, so this can only be checked as another user.
-test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', { skip: process.getuid?.() === 0 }, async () => {
+test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', asAnotherUser, async () => {
 	const dir = join(await tempDir(), 'read-only');
 	await mkdir(dir);
 	await chmod(dir, 0o555);
@@ -81,24 +85,19 @@ test('startup fails, naming LOG_DIR, when LOG_DIR is read-only', { skip: process
 	assert.match(output, /LOG_DIR is not a directory that can be written to: .*read-only/);
 });
 
-// Root can write to a read-only file, so this can only be checked as another user.
-test(
-	'startup fails, naming the file, when the log file in LOG_DIR is read-only',
-	{ skip: process.getuid?.() === 0 },
-	async () => {
-		const dir = await tempDir();
-		await writeFile(join(dir, 'quest-calendars-bot.log'), '');
-		await chmod(join(dir, 'quest-calendars-bot.log'), 0o444);
+test('startup fails, naming the file, when the log file in LOG_DIR is read-only', asAnotherUser, async () => {
+	const dir = await tempDir();
+	const file = join(dir, 'quest-calendars-bot.log');
+	await writeFile(file, '');
+	await chmod(file, 0o444);
 
-		const { code, output } = await start({ LOG_DIR: dir });
+	const { code, output } = await start({ LOG_DIR: dir });
 
-		assert.equal(code, 1);
-		assert.match(output, /LOG_DIR has a log file that can't be written to: .*quest-calendars-bot\.log/);
-	},
-);
+	assert.equal(code, 1);
+	assert.match(output, /LOG_DIR has a log file that can't be written to: .*quest-calendars-bot\.log/);
+});
 
-// Root can enter any directory, so this can only be checked as another user.
-test("startup fails, naming LOG_DIR, when LOG_DIR can't be entered", { skip: process.getuid?.() === 0 }, async () => {
+test("startup fails, naming LOG_DIR, when LOG_DIR can't be entered", asAnotherUser, async () => {
 	const dir = join(await tempDir(), 'no-entry');
 	await mkdir(dir);
 	await chmod(dir, 0o600);
