@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, readdir, readFile, writeFile } from 'node:fs/promises';
+import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './temp-dir.ts';
@@ -117,3 +118,20 @@ test('startup fails, naming DB_FILE, when DB_FILE is not a database', async () =
 	assert.match(output, /DB_FILE can't be opened: .*notes\.txt/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
+
+// Root can write to a read-only file, so this can only be checked as another user.
+test(
+	"startup fails, naming DB_FILE, when DB_FILE can't be written to",
+	{ skip: process.getuid?.() === 0 },
+	async () => {
+		const path = join(await tempDir(), 'read-only.sqlite');
+		new DatabaseSync(path).close();
+		await chmod(path, 0o444);
+
+		const { code, output } = await start({ DB_FILE: path, DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC' });
+
+		assert.equal(code, 1);
+		assert.match(output, /DB_FILE can't be opened: .*read-only\.sqlite/);
+		assert.doesNotMatch(output, /Opened game state/);
+	},
+);
