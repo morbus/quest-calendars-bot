@@ -32,6 +32,7 @@ const BUSY_TIMEOUT_MS = 2000;
 export function openStorage(path: string): Storage {
 	// Wait for another writer on the same file (an overlapping restart) instead of failing at once.
 	const db = new DatabaseSync(path, { timeout: BUSY_TIMEOUT_MS });
+
 	// Opening neither reads nor writes the file, so rewrite its version number unchanged now: a file
 	// that isn't a database, or can't be written to, fails here instead of on the first command.
 	// The lock keeps another process from changing the version between the read and the write.

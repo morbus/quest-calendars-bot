@@ -1,30 +1,22 @@
 /**
- * Colored log lines for the console, and JSON lines in a rotated logs/quest-calendars-bot.log in the project.
+ * Colored log lines for the console, and JSON lines in a rotated logs/quest-calendars-bot.log.
  */
 
 import { fileURLToPath } from 'node:url';
 import winston from 'winston';
 
 /**
- * The log file, in the project's logs/ wherever the bot is started from.
+ * The log file path.
  */
 const LOG_FILE = fileURLToPath(new URL('../logs/quest-calendars-bot.log', import.meta.url));
 
 /**
- * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
- */
-const consoleLine = winston.format.printf(({ timestamp, level, message, stack, ...fields }) => {
-	const extra = Object.keys(fields).length > 0 ? ` ${JSON.stringify(fields)}` : '';
-	return `${timestamp} ${level} ${message}${extra}${stack ? `\n${stack}` : ''}`;
-});
-
-/**
- * The interaction token in a Discord webhook or interaction URL, after the ID it belongs to.
+ * The interaction token in a Discord webhook or interaction URL.
  */
 const DISCORD_TOKEN_IN_URL = /(\/(?:webhooks|interactions)\/\d+\/)[^/?]+/g;
 
 /**
- * Masks the token in a `url` field and drops a `requestBody` field, as discord.js puts on a failed request's error.
+ * Masks the token in a `url` field and drops a `requestBody` field.
  */
 function scrubDiscordRequest(fields: Record<string, unknown>): void {
 	delete fields.requestBody;
@@ -36,11 +28,11 @@ function scrubDiscordRequest(fields: Record<string, unknown>): void {
  *
  * @remarks
  * A reply's URL holds the interaction's token, which lets anyone holding it answer for the bot,
- * and its body holds what only the Player should see. The rest of the URL is kept, for debugging.
+ * and its body holds what only the Player should see. The rest of the URL is kept for debugging.
+ * Unhandled exceptions and rejections arrive nested under `error`. Copy it rather than change it.
  */
 const redactDiscordRequests = winston.format((info) => {
 	scrubDiscordRequest(info);
-	// Unhandled exceptions and rejections arrive nested under `error`. Copy it rather than change the caller's error.
 	if (typeof info.error === 'object' && info.error !== null) {
 		const error: Record<string, unknown> = { ...info.error };
 		scrubDiscordRequest(error);
@@ -50,10 +42,15 @@ const redactDiscordRequests = winston.format((info) => {
 });
 
 /**
- * The bot's logger.
- *
- * @remarks
- * Use `logger.child()` to add fields to every line.
+ * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
+ */
+const consoleLine = winston.format.printf(({ timestamp, level, message, stack, ...fields }) => {
+	const extra = Object.keys(fields).length > 0 ? ` ${JSON.stringify(fields)}` : '';
+	return `${timestamp} ${level} ${message}${extra}${stack ? `\n${stack}` : ''}`;
+});
+
+/**
+ * The bot's logger; use `logger.child()` to add fields to every line.
  */
 export const logger = winston.createLogger({
 	level: 'info',
