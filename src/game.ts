@@ -20,7 +20,10 @@ export type Announcement = {
 };
 
 /**
- * What an Input shows the Player who sent it. The Discord adapter decides how it looks.
+ * What an Input shows the Player who sent it.
+ *
+ * @remarks
+ * The Discord adapter decides how it looks.
  */
 export type Reply = {
 	/**
@@ -45,7 +48,10 @@ export type Result = {
 };
 
 /**
- * Rolls dice. Production rolls at random, and tests script the rolls.
+ * Rolls dice.
+ *
+ * @remarks
+ * Production rolls at random, and tests script the rolls.
  */
 export type Dice = {
 	/**

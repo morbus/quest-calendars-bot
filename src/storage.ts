@@ -5,13 +5,14 @@
 import { DatabaseSync } from 'node:sqlite';
 
 /**
- * Reads and writes the game state in SQLite. Open it with {@link openStorage}.
+ * Reads and writes the game state in SQLite.
+ *
+ * @remarks
+ * Open it with {@link openStorage}.
  */
 export type Storage = {
 	/**
 	 * Runs `work` in one transaction, rolling it back if `work` throws.
-	 *
-	 * @returns What `work` returns.
 	 */
 	transaction<T>(work: () => T): T;
 };
@@ -22,11 +23,15 @@ export type Storage = {
  * @remarks
  * The wait blocks the whole bot, so keep it short enough that a command
  * queued behind one wait still answers within Discord's 3-second window.
+ * A second command queued behind the same lock can still miss it.
  */
 const BUSY_TIMEOUT_MS = 2000;
 
 /**
- * Opens the SQLite file at `path`, creating it if needed. `:memory:` opens a database that lives only in memory.
+ * Opens the SQLite file at `path`, creating it if needed.
+ *
+ * @remarks
+ * `:memory:` opens a database that lives only in memory.
  *
  * @throws When the file can't be opened.
  */

@@ -16,7 +16,7 @@ import type { Game, Input, Reply } from './game.ts';
 import { logger } from './log.ts';
 
 /**
- * The slash commands, for servers and for users who install the bot themselves.
+ * The slash commands, for servers and for Players who install the bot themselves.
  */
 const COMMANDS = [
 	new SlashCommandBuilder()
@@ -35,7 +35,7 @@ const COMMANDS = [
  *
  * @throws When the login fails.
  */
-export async function startBot({ token, game }: { token: string; game: Game }): Promise<Client> {
+export async function startBot({ game, token }: { game: Game; token: string }): Promise<Client> {
 	const client = new Client({ intents: [] });
 
 	client.once(Events.ClientReady, async (ready) => {

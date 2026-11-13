@@ -19,7 +19,10 @@ const consoleLine = winston.format.printf(({ timestamp, level, message, stack, .
 });
 
 /**
- * The bot's logger. Use `logger.child()` to add fields to every line.
+ * The bot's logger.
+ *
+ * @remarks
+ * Use `logger.child()` to add fields to every line.
  */
 export const logger = winston.createLogger({
 	level: 'info',

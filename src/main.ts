@@ -41,7 +41,7 @@ async function main(): Promise<void> {
 	const storage = openStorage(DB_PATH);
 	logger.info('Opened game state', { path: DB_PATH });
 
-	await startBot({ token, game: createGame({ dice: randomDice, storage, timezone }) });
+	await startBot({ game: createGame({ dice: randomDice, storage, timezone }), token });
 }
 
 /**
