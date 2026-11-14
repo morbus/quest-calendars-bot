@@ -89,3 +89,12 @@ test("a split section's image is attached once, to its first part", () => {
 		[['/quests/tower.png'], []],
 	);
 });
+
+test('a section split at 2000 characters keeps each emoji whole', () => {
+	const messages = toMessages({ sections: [{ text: `a${'🐉'.repeat(1500)}` }] });
+
+	assert.deepEqual(
+		messages.map((message) => message.content),
+		[`a${'🐉'.repeat(999)}`, '🐉'.repeat(501)],
+	);
+});

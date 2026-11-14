@@ -184,14 +184,17 @@ export function toMessages(reply: Reply): Message[] {
 }
 
 /**
- * Splits `text` into pieces of at most 2000 characters, at the last line break that fits, or else at 2000.
+ * Splits `text` into pieces of at most 2000 characters, at the last line break that fits, or else at 2000
+ * (or 1999, to keep an emoji whole).
  */
 function splitText(text: string): string[] {
 	const pieces: string[] = [];
 	let rest = text;
 	while (rest.length > MAX_CONTENT_LENGTH) {
 		const lineBreak = rest.lastIndexOf('\n', MAX_CONTENT_LENGTH);
-		const end = lineBreak > 0 ? lineBreak : MAX_CONTENT_LENGTH;
+		let end = lineBreak > 0 ? lineBreak : MAX_CONTENT_LENGTH;
+		// Don't cut between the two halves of a character such as an emoji.
+		if (/[\uD800-\uDBFF]/.test(rest.charAt(end - 1))) end -= 1;
 		pieces.push(rest.slice(0, end));
 		rest = rest.slice(lineBreak > 0 ? end + 1 : end);
 	}
