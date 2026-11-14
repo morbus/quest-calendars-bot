@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { MessageFlags } from 'discord.js';
 import type { ActionRow, Component, MediaGallery, TextDisplay } from '../src/components.ts';
 import { toDiscord, toMessages, type Message } from '../src/discord.ts';
-import type { Image } from '../src/registry.ts';
+import { fileURLToPath } from 'node:url';
+import { createGame } from '../src/game.ts';
+import { loadQuests, type Image } from '../src/registry.ts';
+import { openStorage } from '../src/storage.ts';
 
 /**
  * An image named `name`, of `bytes` bytes.
@@ -184,12 +187,93 @@ test('a box whose texts pass 4000 characters on their own has its longest text c
 	});
 });
 
+test('a box too long for a message is cut to the room the texts before it leave, so it stays with them and its buttons', () => {
+	const box: Component = { components: [text('## Tower'), text('d'.repeat(5000))], type: 'container' };
+
+	const messages = toMessages({ components: [text('Choose a Quest.'), box, row(3)] });
+
+	assert.deepEqual(messages, [
+		{
+			components: [
+				text('Choose a Quest.'),
+				{ components: [text('## Tower'), text(`${'d'.repeat(3976)}…`)], type: 'container' },
+				row(3),
+			],
+		},
+	]);
+});
+
+test('a box that fits in a message of its own goes there whole, rather than cut to the room left', () => {
+	const box: Component = { components: [text('d'.repeat(3000))], type: 'container' };
+
+	const messages = toMessages({ components: [text('x'.repeat(2000)), box] });
+
+	assert.deepEqual(messages, [{ components: [text('x'.repeat(2000))] }, { components: [box] }]);
+});
+
+test('a box that cannot be cut to the room left starts a new message, cut to fit it', () => {
+	const box: Component = { components: [text('## The Clockwork Tower'), text('d'.repeat(5000))], type: 'container' };
+
+	const messages = toMessages({ components: [text('x'.repeat(3990)), box] });
+
+	assert.deepEqual(messages, [
+		{ components: [text('x'.repeat(3990))] },
+		{ components: [{ components: [text('## The Clockwork Tower'), text(`${'d'.repeat(3977)}…`)], type: 'container' }] },
+	]);
+});
+
+test('a box still too long with its longest text cut short has its next longest cut too', () => {
+	const box: Component = {
+		components: [text('a'.repeat(2500)), text('b'.repeat(2500)), text('c'.repeat(2500))],
+		type: 'container',
+	};
+
+	const [message, ...rest] = toMessages({ components: [box] });
+
+	assert.deepEqual(rest, []);
+	assert.deepEqual(message?.components, [
+		{ components: [text('…'), text(`${'b'.repeat(1498)}…`), text('c'.repeat(2500))], type: 'container' },
+	]);
+});
+
+test('a box whose texts are too many to cut short enough is left whole, rather than cut forever', () => {
+	const box: Component = { components: Array.from({ length: 4001 }, () => text('x')), type: 'container' };
+
+	assert.deepEqual(toMessages({ components: [box] }), [{ components: [box] }]);
+});
+
 test('a cut text is cut between graphemes, so an emoji at the limit is left out whole', () => {
 	const box: Component = { components: [text(`${'x'.repeat(3997)}🇯🇵yy`)], type: 'container' };
 
 	const [message] = toMessages({ components: [box] });
 
 	assert.deepEqual(message?.components, [{ components: [text(`${'x'.repeat(3997)}…`)], type: 'container' }]);
+});
+
+test('a Quest and Characters with texts too long for Discord each show in one message, with the longest text cut', async () => {
+	const quests = await loadQuests([fileURLToPath(new URL('fixtures/long-quests/', import.meta.url))]);
+	const game = createGame({ quests, storage: openStorage(':memory:') });
+	const press = (button: string) => game.handle('player-1', null, { button }, new Date()).reply;
+	const replies = [
+		game.handle('player-1', null, { command: 'quest start' }, new Date()).reply,
+		press('quest:endless-library'),
+		press('next:characters:endless-library:1'),
+	];
+
+	const cutTexts = replies.map((reply) => {
+		const messages = toMessages(reply);
+		assert.equal(messages.length, 1);
+		const box = messages[0]!.components[1]!;
+		assert.equal(box.type, 'container');
+		return box.type === 'container'
+			? box.components.flatMap((part) =>
+					part.type === 'textDisplay' && part.content.endsWith('…') ? [part.content.split('\n')[0]] : [],
+				)
+			: [];
+	});
+
+	// The cut text in each: the Quest's description, the Archivist's Abilities, and the Reader's description.
+	assert.deepEqual(cutTexts, [['## The Endless Library'], ['**Abilities**'], ['## The Reader']]);
 });
 
 /**

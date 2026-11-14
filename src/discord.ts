@@ -174,30 +174,48 @@ function toInput(command: string): Input {
  *
  * @remarks
  * A text too long for one message is split at a line break, or else between graphemes, into texts
- * of their own. Any other part whose texts are too long for one message has its longest text cut short.
+ * of their own. Any other part whose texts are too long has its longest text cut short: to the room
+ * left in the message before it, so it stays with what came before, or else to fit a message of its own.
  */
 export function toMessages(reply: Reply): Message[] {
 	const messages: Message[] = [];
-	for (const part of reply.components.flatMap(fitAlone)) {
+	for (const part of reply.components.flatMap(splitLongText)) {
 		const last = messages.at(-1);
-		if (last !== undefined && fits([...last.components, part])) last.components.push(part);
-		else messages.push({ components: [part] });
+		// A part that must be cut anyway is cut to the room left, so it stays with what came before.
+		const mustCut = textLength([part]) > MAX_TEXT_LENGTH;
+		const room = last === undefined ? 0 : MAX_TEXT_LENGTH - textLength(last.components);
+		const shown = mustCut ? cut(part, room, 1) : part;
+		if (last !== undefined && shown !== undefined && fits([...last.components, shown])) {
+			last.components.push(shown);
+		} else {
+			messages.push({ components: [cut(part, MAX_TEXT_LENGTH, Infinity) ?? part] });
+		}
 	}
 	return messages;
 }
 
 /**
- * `part` as parts that each fit in a message on their own.
+ * `part` as texts that each fit in a message on their own, when it's a text, or else `part` itself.
  */
-function fitAlone(part: Component): Component[] {
-	if (part.type === 'textDisplay') return splitText(part.content).map((content) => ({ content, type: 'textDisplay' }));
+function splitLongText(part: Component): Component[] {
+	if (part.type !== 'textDisplay') return [part];
+	return splitText(part.content).map((content) => ({ content, type: 'textDisplay' }));
+}
+
+/**
+ * `part` with up to `texts` of its texts cut short, longest first, each with an ellipsis, until they hold
+ * at most `max` characters together, or `undefined` when they can't.
+ * A text on its own is never cut, since {@link splitLongText} splits it instead.
+ */
+function cut(part: Component, max: number, texts: number): Component | undefined {
 	let fitted = part;
-	while (textLength([fitted]) > MAX_TEXT_LENGTH) {
+	for (let cuts = 0; textLength([fitted]) > max; cuts++) {
 		const longest = textsIn([fitted]).reduce((a, b) => (b.content.length > a.content.length ? b : a));
-		const max = longest.content.length - (textLength([fitted]) - MAX_TEXT_LENGTH);
-		fitted = withText(fitted, longest, clip(longest.content, max));
+		if (cuts === texts || longest.content.length <= 1) return undefined;
+		const room = longest.content.length - (textLength([fitted]) - max);
+		fitted = withText(fitted, longest, clip(longest.content, Math.max(room, 1)));
 	}
-	return [fitted];
+	return fitted;
 }
 
 /**
