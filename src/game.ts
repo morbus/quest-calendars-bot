@@ -19,13 +19,13 @@ export type Input = { command: 'quest start' } | { button: string };
  */
 export type Reply = {
 	/**
-	 * What to show, in order, as paragraphs of text.
-	 */
-	sections: string[];
-	/**
 	 * The buttons to offer, in order.
 	 */
 	buttons?: Button[];
+	/**
+	 * What to show, in order, as paragraphs of text.
+	 */
+	sections: string[];
 };
 
 /**
@@ -78,7 +78,7 @@ export function createGame({ quests, storage }: { quests: Quest[]; storage: Stor
 		handle(_playerId, _serverId, input, _now) {
 			return storage.transaction(() => {
 				if ('command' in input) return { reply: listQuests(quests) };
-				const quest = quests.find((quest) => `quest:${quest.id}` === input.button);
+				const quest = quests.find((quest) => questButtonId(quest) === input.button);
 				if (!quest)
 					return { reply: { sections: ['That Quest is no longer available. Use /quest start to see the Quests.'] } };
 				return { reply: listCharacters(quest) };
@@ -94,8 +94,15 @@ function listQuests(quests: Quest[]): Reply {
 	if (quests.length === 0) return { sections: ['Quests are coming soon.'] };
 	return {
 		sections: ['Choose a Quest.'],
-		buttons: quests.map((quest) => ({ id: `quest:${quest.id}`, label: quest.name })),
+		buttons: quests.map((quest) => ({ id: questButtonId(quest), label: quest.name })),
 	};
+}
+
+/**
+ * The id of the button that chooses `quest`.
+ */
+function questButtonId(quest: Quest): string {
+	return `quest:${quest.id}`;
 }
 
 /**

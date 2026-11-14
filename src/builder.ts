@@ -96,6 +96,9 @@ export type Ability = {
  * A Character, from one file in its Quest's characters/ directory.
  */
 export type Character = {
+	/**
+	 * The Character's starting Abilities, in the order Players see them.
+	 */
 	abilities: Ability[];
 	/**
 	 * Identifies the Character within its Quest: lowercase letters, digits, and hyphens.
@@ -105,7 +108,13 @@ export type Character = {
 	 * The Character's name, as Players see it.
 	 */
 	name: string;
+	/**
+	 * The Character's starting Stats.
+	 */
 	stats: Stats;
+	/**
+	 * The Character's starting Traits.
+	 */
 	traits: Traits;
 };
 

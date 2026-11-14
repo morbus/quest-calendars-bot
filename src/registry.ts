@@ -15,12 +15,12 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 /**
  * The longest id, which keeps the button ids made from it within Discord's 100 characters.
  */
-const ID_LENGTH = 64;
+const MAX_ID_LENGTH = 64;
 
 /**
  * The longest Quest or Character name, which is Discord's limit for a button label.
  */
-const NAME_LENGTH = 80;
+const MAX_NAME_LENGTH = 80;
 
 /**
  * Dice to roll, such as "d6" or "2d4".
@@ -31,11 +31,16 @@ const DICE = /^([1-9]\d*)?d[1-9]\d*$/;
  * A loaded Quest: its metadata and its Characters.
  */
 export type Quest = QuestMetadata & {
+	/**
+	 * The Quest's Characters, sorted by name.
+	 */
 	characters: Character[];
 };
 
 /**
  * Loads every Quest directory in `dir`, sorted by name.
+ *
+ * @throws When a Quest is invalid, naming the file at fault and the problem.
  */
 export async function loadQuests(dir: string): Promise<Quest[]> {
 	const quests: Quest[] = [];
@@ -105,7 +110,7 @@ function checkMetadata(value: unknown): QuestMetadata {
 	checkObject('the default export', value);
 	const metadata = value as QuestMetadata;
 	checkId(metadata.id);
-	checkText('name', metadata.name, NAME_LENGTH);
+	checkText('name', metadata.name, MAX_NAME_LENGTH);
 	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
 	checkText('currency', metadata.currency);
 	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
@@ -130,7 +135,7 @@ function checkCharacter(value: unknown): Character {
 	checkObject('the default export', value);
 	const character = value as Character;
 	checkId(character.id);
-	checkText('name', character.name, NAME_LENGTH);
+	checkText('name', character.name, MAX_NAME_LENGTH);
 	checkObject('stats', character.stats);
 	const { attack, damage, defense, maxHealth } = character.stats;
 	if (typeof damage !== 'string' || !DICE.test(damage)) fail('stats.damage', 'dice, such as d6 or 2d4', damage);
@@ -155,7 +160,7 @@ function checkCharacter(value: unknown): Character {
  */
 function checkId(id: unknown): void {
 	if (typeof id !== 'string' || !ID.test(id)) fail('id', 'lowercase letters, digits, and hyphens', id);
-	if (id.length > ID_LENGTH) fail('id', `at most ${ID_LENGTH} characters`, id);
+	if (id.length > MAX_ID_LENGTH) fail('id', `at most ${MAX_ID_LENGTH} characters`, id);
 }
 
 /**
