@@ -5,6 +5,7 @@
 import { startBot } from './discord.ts';
 import { createGame } from './game.ts';
 import { logger } from './log.ts';
+import { loadQuests } from './registry.ts';
 import { openStorage } from './storage.ts';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +13,11 @@ import { fileURLToPath } from 'node:url';
  * The SQLite file that holds the game state, in the project wherever the bot is started from.
  */
 const DB_FILE = fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.meta.url));
+
+/**
+ * The Quest directories, in the project wherever the bot is started from.
+ */
+const QUESTS_DIR = fileURLToPath(new URL('../quests/', import.meta.url));
 
 /**
  * How long a failed startup waits for its last log lines to be written before it forces Node to exit.
@@ -53,7 +59,17 @@ async function main(): Promise<void> {
 	}
 	logger.info('Opened game state', { from: DB_FILE });
 
-	await startBot({ game: createGame({ storage }), token });
+	let quests;
+	try {
+		quests = await loadQuests(QUESTS_DIR);
+	} catch (error) {
+		logger.error(`Quests can't be loaded: ${QUESTS_DIR}`, error);
+		process.exitCode = 1;
+		return;
+	}
+	logger.info('Loaded Quests', { quests: quests.map((quest) => quest.name) });
+
+	await startBot({ game: createGame({ quests, storage }), token });
 }
 
 main().catch((error) => {
