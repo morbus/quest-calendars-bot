@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Character, QuestMetadata } from '../src/builder.ts';
-import { loadQuests, type Quest } from '../src/registry.ts';
+import { loadQuests } from '../src/registry.ts';
 
 /**
  * The builder API, as the Quest files written by {@link load} import it.
@@ -540,7 +540,7 @@ test("a Character image elsewhere in its Quest's directory loads", async () => {
 	await writeFile(join(dir.path, 'quest-1', '..map.png'), Buffer.alloc(2));
 	await writeFile(characterFile, source('character', { ...CHARACTER, image: '../..map.png' }));
 
-	const [quest] = (await loadQuests([dir.path])) as Quest[];
+	const [quest] = await loadQuests([dir.path]);
 
 	assert.deepEqual(quest?.characters[0]?.image, { data: Buffer.alloc(2), name: '..map.png' });
 });

@@ -80,5 +80,5 @@ export default character({
 
 A Quest or a Character can show an image, such as a map or a portrait.
 `image` names a `.gif`, `.jpeg`, `.jpg`, `.png`, or `.webp` file relative to the file that names it, of at most 8 MiB, the most Discord takes in one message.
-A Quest is self-contained, so its images must be inside its own directory: a Character can use `../map.png`, but not a file in another Quest or an absolute path.
+A Quest is self-contained, so its images must be inside its own directory: a Character can use `../map.png`, but not a file in another Quest, an absolute path, or a symbolic link that leads outside.
 The bot reads images when it starts, so restart it after you change one.

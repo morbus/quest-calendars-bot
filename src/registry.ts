@@ -308,8 +308,9 @@ function checkName(name: unknown): void {
  */
 function checkText(field: string, value: unknown, maxLength?: number): void {
 	const ok = typeof value === 'string' && value.trim().length > 0 && value.length <= (maxLength ?? value.length);
-	if (!ok)
+	if (!ok) {
 		fail(field, `text${maxLength === undefined ? '' : ` of 1 to ${maxLength} characters`} that isn't blank`, value);
+	}
 }
 
 /**
