@@ -23,9 +23,53 @@ export type Reply = {
 	 */
 	buttons?: Button[];
 	/**
+	 * One thing to show on its own, such as a Quest or a Character, after the sections.
+	 */
+	card?: Card;
+	/**
 	 * What to show, in order.
 	 */
 	sections: Section[];
+};
+
+/**
+ * One Quest or Character, shown on its own with its image.
+ */
+export type Card = {
+	/**
+	 * What it is about.
+	 */
+	description: string;
+	/**
+	 * Named details, in order, such as a Character's Stats, Traits, and Abilities.
+	 */
+	fields: Field[];
+	/**
+	 * Where it sits among the others, such as "Quest 1 of 2".
+	 */
+	footer: string;
+	/**
+	 * An image to show with it.
+	 */
+	image?: Image;
+	/**
+	 * Its name.
+	 */
+	title: string;
+};
+
+/**
+ * One named detail of a {@link Card}.
+ */
+export type Field = {
+	/**
+	 * What the detail is, such as "Stats".
+	 */
+	name: string;
+	/**
+	 * The detail itself.
+	 */
+	value: string;
 };
 
 /**
@@ -46,6 +90,10 @@ export type Section = {
  * A button the Player can press, which comes back as an Input with its `id`.
  */
 export type Button = {
+	/**
+	 * Whether it is shown but can't be pressed, such as Previous on the first page.
+	 */
+	disabled?: boolean;
 	/**
 	 * Identifies the press to the Game; the Discord adapter passes it back unread.
 	 */
@@ -91,27 +139,69 @@ export function createGame({ quests, storage }: { quests: Quest[]; storage: Stor
 	return {
 		handle(_playerId, _serverId, input, _now) {
 			return storage.transaction(() => {
-				if ('command' in input) return { reply: listQuests(quests) };
+				if ('command' in input) return { reply: showQuest(quests, 0) };
+				const questPage = /^(?:prev|next):quests:(\d+)$/.exec(input.button);
+				if (questPage) return { reply: showQuest(quests, page(questPage[1], quests, input.button)) };
+				const characterPage = /^(?:prev|next):characters:([a-z0-9-]+):(\d+)$/.exec(input.button);
+				if (characterPage) {
+					const quest = quests.find((quest) => quest.id === characterPage[1]);
+					if (!quest) throw new Error(`Unknown button: ${input.button}`);
+					return { reply: showCharacter(quest, page(characterPage[2], quest.characters, input.button)) };
+				}
+				const chosen = /^character:([a-z0-9-]+):(\d+)$/.exec(input.button);
+				if (chosen) {
+					const quest = quests.find((quest) => quest.id === chosen[1]);
+					if (!quest) throw new Error(`Unknown button: ${input.button}`);
+					page(chosen[2], quest.characters, input.button);
+					return { reply: { sections: [{ text: 'Starting a Quest is coming soon.' }] } };
+				}
 				const quest = quests.find((quest) => questButtonId(quest) === input.button);
 				if (!quest) throw new Error(`Unknown button: ${input.button}`);
-				return { reply: listCharacters(quest) };
+				return { reply: showCharacter(quest, 0) };
 			});
 		},
 	};
 }
 
 /**
- * Describes each Quest, with its image, and offers it as a button, or says none are ready yet.
+ * Shows the Quest at `index` on its own, with buttons to choose it or page to the others,
+ * or says none are ready yet.
  */
-function listQuests(quests: Quest[]): Reply {
-	if (quests.length === 0) return { sections: [{ text: 'Quests are coming soon.' }] };
+function showQuest(quests: Quest[], index: number): Reply {
+	const quest = quests[index];
+	if (quest === undefined) return { sections: [{ text: 'Quests are coming soon.' }] };
+	const [previous, next] = pageButtons('quests', index, quests.length);
 	return {
-		buttons: quests.map((quest) => ({ id: questButtonId(quest), label: quest.name })),
-		sections: [
-			{ text: 'Choose a Quest.' },
-			...quests.map((quest) => section(quest, `${quest.name}\n${quest.description}`)),
-		],
+		buttons: [previous, { id: questButtonId(quest), label: 'Choose this Quest' }, next],
+		card: card(quest, quest.description, [], `Quest ${index + 1} of ${quests.length}`),
+		sections: [{ text: 'Choose a Quest.' }],
 	};
+}
+
+/**
+ * Previous and Next buttons for page `index` of `count`, whose ids lead to the page before and after it,
+ * wrapping around at either end. Both are disabled when there's only one page.
+ *
+ * @remarks
+ * Each id starts with its direction, so the two differ even when they lead to the same page.
+ */
+function pageButtons(list: string, index: number, count: number): [Button, Button] {
+	const disabled = count === 1;
+	return [
+		{ disabled, id: `prev:${list}:${(index - 1 + count) % count}`, label: 'Previous' },
+		{ disabled, id: `next:${list}:${(index + 1) % count}`, label: 'Next' },
+	];
+}
+
+/**
+ * The page a button's id leads to in `items`.
+ *
+ * @throws When there's no such page, such as after the Quests changed.
+ */
+function page(digits: string | undefined, items: unknown[], button: string): number {
+	const index = Number(digits);
+	if (!(index < items.length)) throw new Error(`Unknown button: ${button}`);
+	return index;
 }
 
 /**
@@ -122,36 +212,54 @@ function questButtonId(quest: Quest): string {
 }
 
 /**
- * Shows each of a Quest's Characters with their description, image, Stats, Traits, and Abilities.
+ * Shows the Character at `index` in `quest` on its own, with their Stats, Traits, and Abilities,
+ * and buttons to choose them or page to the others.
  */
-function listCharacters(quest: Quest): Reply {
+function showCharacter(quest: Quest, index: number): Reply {
+	const character = quest.characters[index]!;
+	const count = quest.characters.length;
+	const [previous, next] = pageButtons(`characters:${quest.id}`, index, count);
 	return {
-		sections: [
-			{ text: `Characters in ${quest.name}:` },
-			...quest.characters.map((character) => section(character, describeCharacter(character))),
-		],
+		buttons: [previous, { id: `character:${quest.id}:${index}`, label: 'Choose this Character' }, next],
+		card: card(
+			character,
+			character.description,
+			characterFields(character),
+			`Character ${index + 1} of ${count} in ${quest.name}`,
+		),
+		sections: [{ text: `Choose a Character for ${quest.name}.` }],
 	};
 }
 
 /**
- * A Character's name and description, then a line each for their Stats, Traits, and Abilities.
+ * A Character's Stats, Traits, and Abilities, a field each.
  */
-function describeCharacter({ abilities, description, name, stats, traits }: Loaded<Character>): string {
+function characterFields({ abilities, stats, traits }: Loaded<Character>): Field[] {
 	return [
-		name,
-		description,
-		`Stats: Max Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`,
-		`Traits: ${TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ')}`,
-		abilities.length === 0 ? 'Abilities: none' : 'Abilities:',
-		...abilities.map((ability) => `- ${ability.name}: ${ability.text}`),
-	].join('\n');
+		{
+			name: 'Stats',
+			value: `Max Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`,
+		},
+		{ name: 'Traits', value: TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ') },
+		{
+			name: 'Abilities',
+			value:
+				abilities.length === 0 ? 'none' : abilities.map((ability) => `- ${ability.name}: ${ability.text}`).join('\n'),
+		},
+	];
 }
 
 /**
- * A section that says `text`, with the image of the Quest or Character it's about, if any.
+ * A card for a Quest or Character, with its image, if any.
  */
-function section({ image }: { image?: Image }, text: string): Section {
-	return image === undefined ? { text } : { image, text };
+function card(
+	{ image, name }: { image?: Image; name: string },
+	description: string,
+	fields: Field[],
+	footer: string,
+): Card {
+	const shown = { description, fields, footer, title: name };
+	return image === undefined ? shown : { ...shown, image };
 }
 
 /**
