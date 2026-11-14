@@ -13,4 +13,4 @@ quests/
 ```
 
 `quest()` and `character()` come from `src/builder.ts`, whose types list every field.
-`npm run typecheck` checks every Quest.
+`npm run typecheck` checks each field's type. Startup checks the rest: ids, Rule Modules, the meter, dice, and whole numbers.
