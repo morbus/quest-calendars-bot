@@ -18,8 +18,7 @@ const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 const LOG_FILE = fileURLToPath(new URL('../logs/quest-calendars-bot.log', import.meta.url));
 
 /**
- * Starts the bot from `cwd` with only `env` set, waits for it to exit, and returns its exit code and every
- * line it printed.
+ * Starts the bot from `cwd` with only `env` set, waits for an exit, and returns its exit code and every line printed.
  */
 async function start(env: Record<string, string>, cwd?: string): Promise<{ code: number | null; output: string }> {
 	const child = spawn(process.execPath, [MAIN], { cwd, env: { PATH: process.env.PATH ?? '', ...env } });
