@@ -2,7 +2,7 @@
  * The Quest registry: loads every Quest directory at startup and rejects invalid content.
  */
 
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RULE_MODULES, TRAITS, type Character, type QuestMetadata } from './builder.ts';
@@ -45,23 +45,28 @@ export type Quest = QuestMetadata & {
 export async function loadQuests(dir: string): Promise<Quest[]> {
 	const quests: Quest[] = [];
 	const questIds = new Map<string, string>();
-	for (const entry of await readdir(dir, { withFileTypes: true })) {
-		if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-		const questDir = join(dir, entry.name);
+	const questNames = new Map<string, string>();
+	for (const entry of await readdir(dir)) {
+		const questDir = join(dir, entry);
+		// stat() follows a symbolic link, so a linked Quest directory loads too.
+		if (entry.startsWith('.') || !(await stat(questDir)).isDirectory()) continue;
 		const metadataFile = join(questDir, 'quest.ts');
 		const metadata = await loadFile(metadataFile, checkMetadata);
-		claimId(questIds, metadata.id, metadataFile);
+		claim(questIds, 'id', metadata.id, metadataFile);
+		claim(questNames, 'name', metadata.name, metadataFile);
 		const characters: Character[] = [];
 		const characterIds = new Map<string, string>();
-		const characterNames = await readdir(join(questDir, 'characters')).catch((error) => {
+		const characterNames = new Map<string, string>();
+		const characterFiles = await readdir(join(questDir, 'characters')).catch((error) => {
 			if (error.code === 'ENOENT') return [];
 			throw error;
 		});
-		for (const name of characterNames) {
-			if (!name.endsWith('.ts')) continue;
+		for (const name of characterFiles) {
+			if (name.startsWith('.') || !name.endsWith('.ts')) continue;
 			const file = join(questDir, 'characters', name);
 			const character = await loadFile(file, checkCharacter);
-			claimId(characterIds, character.id, file);
+			claim(characterIds, 'id', character.id, file);
+			claim(characterNames, 'name', character.name, file);
 			characters.push(character);
 		}
 		if (characters.length === 0) throw new Error(`${join(questDir, 'characters')}: has no Characters`);
@@ -78,14 +83,14 @@ function byName(a: { name: string }, b: { name: string }): number {
 }
 
 /**
- * Records that `file` declares `id`.
+ * Records that `file` declares `value` as its `field`, such as its id.
  *
- * @throws When an earlier file in `ids` declared `id`.
+ * @throws When an earlier file in `claimed` declared the same value.
  */
-function claimId(ids: Map<string, string>, id: string, file: string): void {
-	const earlier = ids.get(id);
-	if (earlier) throw new Error(`${file}: id ${id} is already used by ${earlier}`);
-	ids.set(id, file);
+function claim(claimed: Map<string, string>, field: 'id' | 'name', value: string, file: string): void {
+	const earlier = claimed.get(value);
+	if (earlier) throw new Error(`${file}: ${field} ${value} is already used by ${earlier}`);
+	claimed.set(value, file);
 }
 
 /**
@@ -110,12 +115,15 @@ function checkMetadata(value: unknown): QuestMetadata {
 	checkObject('the default export', value);
 	const metadata = value as QuestMetadata;
 	checkId(metadata.id);
-	checkText('name', metadata.name, MAX_NAME_LENGTH);
+	checkName(metadata.name);
 	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
 	checkText('currency', metadata.currency);
 	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
-	for (const ruleModule of metadata.ruleModules) {
+	for (const [i, ruleModule] of metadata.ruleModules.entries()) {
 		if (!RULE_MODULES.includes(ruleModule)) throw new Error(`ruleModules has an unknown Rule Module: ${ruleModule}`);
+		if (metadata.ruleModules.indexOf(ruleModule) !== i) {
+			throw new Error(`ruleModules turns on ${ruleModule} more than once`);
+		}
 	}
 	const hasMeter = metadata.ruleModules.includes('meter');
 	if (metadata.meter !== undefined) {
@@ -135,7 +143,7 @@ function checkCharacter(value: unknown): Character {
 	checkObject('the default export', value);
 	const character = value as Character;
 	checkId(character.id);
-	checkText('name', character.name, MAX_NAME_LENGTH);
+	checkName(character.name);
 	checkObject('stats', character.stats);
 	const { attack, damage, defense, maxHealth } = character.stats;
 	if (typeof damage !== 'string' || !DICE.test(damage)) fail('stats.damage', 'dice, such as d6 or 2d4', damage);
@@ -164,12 +172,22 @@ function checkId(id: unknown): void {
 }
 
 /**
- * Accepts text that isn't empty, of at most `maxLength` characters if given.
+ * Accepts a Quest or Character name, which Players see on a button.
+ *
+ * @throws When it isn't one line of text of at most {@link MAX_NAME_LENGTH} characters.
+ */
+function checkName(name: unknown): void {
+	checkText('name', name, MAX_NAME_LENGTH);
+	if (/[\r\n]/.test(name as string)) fail('name', 'one line', name);
+}
+
+/**
+ * Accepts text that isn't blank, of at most `maxLength` characters if given.
  *
  * @throws When `value`, at `field`, isn't.
  */
 function checkText(field: string, value: unknown, maxLength?: number): void {
-	const ok = typeof value === 'string' && value.length > 0 && value.length <= (maxLength ?? value.length);
+	const ok = typeof value === 'string' && value.trim().length > 0 && value.length <= (maxLength ?? value.length);
 	if (!ok) fail(field, maxLength === undefined ? 'text' : `text of 1 to ${maxLength} characters`, value);
 }
 
@@ -195,5 +213,7 @@ function checkObject(field: string, value: unknown): void {
  * Rejects `value`, at `field`, for not being what was `expected`.
  */
 function fail(field: string, expected: string, value: unknown): never {
-	throw new Error(`${field} must be ${expected}, not ${JSON.stringify(value)}`);
+	// JSON shows NaN and Infinity as null, so numbers are shown as they are.
+	const shown = typeof value === 'number' ? String(value) : JSON.stringify(value);
+	throw new Error(`${field} must be ${expected}, not ${shown}`);
 }

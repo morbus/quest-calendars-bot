@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtempDisposable, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtempDisposable, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -89,7 +89,9 @@ test('two Characters in one Quest with the same id fail to load', async () => {
 });
 
 test('Characters in different Quests can share an id', async () => {
-	await assert.doesNotReject(load([{}, { metadata: { ...METADATA, id: 'amber-road-again' } }]));
+	await assert.doesNotReject(
+		load([{}, { metadata: { ...METADATA, id: 'amber-road-again', name: 'The Amber Road Again' } }]),
+	);
 });
 
 test('a Character whose Damage is not a die fails to load', async () => {
@@ -279,6 +281,31 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 		quest: { characters: [{ ...CHARACTER, abilities: [{ name: 'Devout' }] }] },
 		error: /character-1\.ts: abilities\[0\]\.text must be text, not undefined/,
 	},
+	{
+		name: 'a Rule Module turned on twice',
+		quest: { metadata: { ...METADATA, meter: 'Virtue', ruleModules: ['meter', 'meter'] } },
+		error: /quest\.ts: ruleModules turns on meter more than once/,
+	},
+	{
+		name: 'a Quest name of only spaces',
+		quest: { metadata: { ...METADATA, name: '   ' } },
+		error: /quest\.ts: name must be text of 1 to 80 characters, not "   "/,
+	},
+	{
+		name: 'a Quest name across two lines',
+		quest: { metadata: { ...METADATA, name: 'The Amber\nRoad' } },
+		error: /quest\.ts: name must be one line, not "The Amber\\nRoad"/,
+	},
+	{
+		name: 'an Ability text of only spaces',
+		quest: { characters: [{ ...CHARACTER, abilities: [{ name: 'Devout', text: ' ' }] }] },
+		error: /character-1\.ts: abilities\[0\]\.text must be text, not " "/,
+	},
+	{
+		name: 'two Characters in one Quest with the same name',
+		quest: { characters: [CHARACTER, { ...CHARACTER, id: 'pilgrim-again' }] },
+		error: /character-2\.ts: name Pilgrim is already used by .*character-1\.ts/,
+	},
 ];
 
 for (const { error, name, quest } of MALFORMED) {
@@ -320,4 +347,41 @@ test('a characters that is a file, not a directory, fails to load', async () => 
 	await writeFile(join(dir.path, 'quest-1', 'characters'), '');
 
 	await assert.rejects(loadQuests(dir.path), /ENOTDIR/);
+});
+
+test('two Quests with the same name fail to load', async () => {
+	await assert.rejects(
+		load([{}, { metadata: { ...METADATA, id: 'amber-road-again' } }]),
+		/quest-2\/quest\.ts: name The Amber Road is already used by .*quest-1\/quest\.ts/,
+	);
+});
+
+test('a number that is not a number is named as such', async () => {
+	// JSON, which load() writes Quests with, has no NaN, so this Quest is written by hand.
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await mkdir(join(dir.path, 'quest-1', 'characters'), { recursive: true });
+	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', METADATA));
+	const pilgrim = source('character', CHARACTER).replace('"maxHealth":8', '"maxHealth":NaN');
+	await writeFile(join(dir.path, 'quest-1', 'characters', 'pilgrim.ts'), pilgrim);
+
+	await assert.rejects(loadQuests(dir.path), /stats\.maxHealth must be a whole number of at least 1, not NaN/);
+});
+
+test('hidden files in characters/, such as editor lock files, are not Characters', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await mkdir(join(dir.path, 'quest-1', 'characters'), { recursive: true });
+	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', METADATA));
+	await writeFile(join(dir.path, 'quest-1', 'characters', 'pilgrim.ts'), source('character', CHARACTER));
+	await writeFile(join(dir.path, 'quest-1', 'characters', '._pilgrim.ts'), 'not TypeScript');
+
+	await assert.doesNotReject(loadQuests(dir.path));
+});
+
+test('a Quest directory that is a symbolic link loads', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await symlink(fileURLToPath(new URL('fixtures/quests/pilgrimage', import.meta.url)), join(dir.path, 'pilgrimage'));
+
+	const quests = (await loadQuests(dir.path)).map((quest) => quest.name);
+
+	assert.deepEqual(quests, ['The Amber Road']);
 });
