@@ -2,8 +2,9 @@
  * The Quest registry: loads every Quest directory at startup and rejects invalid content.
  */
 
+import { statSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RULE_MODULES, TRAITS, type Character, type QuestMetadata } from './builder.ts';
 
@@ -26,6 +27,11 @@ const MAX_NAME_LENGTH = 80;
  * The most Quests, which is the most buttons Discord shows in one message.
  */
 const MAX_QUESTS = 25;
+
+/**
+ * The image files Discord shows in a message.
+ */
+const IMAGE_EXTENSIONS = ['.gif', '.jpeg', '.jpg', '.png', '.webp'];
 
 /**
  * Dice to roll, such as "d6" or "2d4".
@@ -123,20 +129,20 @@ function claim(claimed: Map<string, string>, field: 'id' | 'name', value: string
  *
  * @throws When the file can't be imported or `check` rejects it, naming the file.
  */
-async function loadFile<T>(file: string, check: (value: unknown) => T): Promise<T> {
+async function loadFile<T>(file: string, check: (value: unknown, file: string) => T): Promise<T> {
 	try {
-		return check((await import(pathToFileURL(file).href)).default);
+		return check((await import(pathToFileURL(file).href)).default, file);
 	} catch (error) {
 		throw new Error(`${file}: ${error instanceof Error ? error.message : error}`, { cause: error });
 	}
 }
 
 /**
- * Accepts valid Quest metadata.
+ * Accepts valid Quest metadata from `file`, with its image's full path.
  *
  * @throws When it isn't.
  */
-function checkMetadata(value: unknown): QuestMetadata {
+function checkMetadata(value: unknown, file: string): QuestMetadata {
 	checkObject('the default export', value);
 	const metadata = value as QuestMetadata;
 	checkId(metadata.id);
@@ -157,15 +163,15 @@ function checkMetadata(value: unknown): QuestMetadata {
 		checkText('meter', metadata.meter);
 	}
 	if (hasMeter && metadata.meter === undefined) throw new Error('ruleModules turns on meter, but meter has no name');
-	return metadata;
+	return withImage(metadata, file);
 }
 
 /**
- * Accepts a valid Character.
+ * Accepts a valid Character from `file`, with its image's full path.
  *
  * @throws When it isn't.
  */
-function checkCharacter(value: unknown): Character {
+function checkCharacter(value: unknown, file: string): Character {
 	checkObject('the default export', value);
 	const character = value as Character;
 	checkId(character.id);
@@ -185,7 +191,23 @@ function checkCharacter(value: unknown): Character {
 		checkText(`abilities[${i}].name`, ability.name);
 		checkText(`abilities[${i}].text`, ability.text);
 	}
-	return character;
+	return withImage(character, file);
+}
+
+/**
+ * `declared`, with its image, if any, as the full path of a file beside `file`.
+ *
+ * @throws When the image isn't an image file, or doesn't exist.
+ */
+function withImage<T extends { image?: string }>(declared: T, file: string): T {
+	const { image } = declared;
+	if (image === undefined) return declared;
+	if (typeof image !== 'string' || !IMAGE_EXTENSIONS.includes(extname(image).toLowerCase())) {
+		fail('image', 'a .gif, .jpeg, .jpg, .png, or .webp file', image);
+	}
+	const path = resolve(dirname(file), image);
+	if (!statSync(path, { throwIfNoEntry: false })?.isFile()) fail('image', 'a file beside this one', image);
+	return { ...declared, image: path };
 }
 
 /**

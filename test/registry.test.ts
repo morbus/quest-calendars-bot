@@ -294,6 +294,21 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 		error: /character-1\.ts: description must be text, not " "/,
 	},
 	{
+		name: 'a Quest image that is not an image file',
+		quest: { metadata: { ...METADATA, image: 'notes.txt' } },
+		error: /quest\.ts: image must be a \.gif, \.jpeg, \.jpg, \.png, or \.webp file, not "notes\.txt"/,
+	},
+	{
+		name: 'a Quest image that is not text',
+		quest: { metadata: { ...METADATA, image: 5 } },
+		error: /quest\.ts: image must be a \.gif, \.jpeg, \.jpg, \.png, or \.webp file, not 5/,
+	},
+	{
+		name: 'a Character image that does not exist',
+		quest: { characters: [{ ...CHARACTER, image: 'missing.png' }] },
+		error: /character-1\.ts: image must be a file beside this one, not "missing\.png"/,
+	},
+	{
 		name: 'a Rule Module turned on twice',
 		quest: { metadata: { ...METADATA, meter: 'Virtue', ruleModules: ['meter', 'meter'] } },
 		error: /quest\.ts: ruleModules turns on meter more than once/,

@@ -33,6 +33,10 @@ export type Reply = {
  */
 export type Section = {
 	/**
+	 * The full path of an image file to show with it.
+	 */
+	image?: string;
+	/**
 	 * What the paragraph says.
 	 */
 	text: string;
@@ -104,7 +108,7 @@ function listQuests(quests: Quest[]): Reply {
 	return {
 		sections: [
 			{ text: 'Choose a Quest.' },
-			...quests.map((quest) => ({ text: `${quest.name}\n${quest.description}` })),
+			...quests.map((quest) => section(quest, `${quest.name}\n${quest.description}`)),
 		],
 		buttons: quests.map((quest) => ({ id: questButtonId(quest), label: quest.name })),
 	};
@@ -124,7 +128,7 @@ function listCharacters(quest: Quest): Reply {
 	return {
 		sections: [
 			{ text: `Characters in ${quest.name}:` },
-			...quest.characters.map((character) => ({ text: describeCharacter(character) })),
+			...quest.characters.map((character) => section(character, describeCharacter(character))),
 		],
 	};
 }
@@ -141,6 +145,13 @@ function describeCharacter({ abilities, description, name, stats, traits }: Char
 		abilities.length === 0 ? 'Abilities: none' : 'Abilities:',
 		...abilities.map((ability) => `- ${ability.name}: ${ability.text}`),
 	].join('\n');
+}
+
+/**
+ * A section that says `text`, with the image of the Quest or Character it's about, if any.
+ */
+function section({ image }: { image?: string }, text: string): Section {
+	return image === undefined ? { text } : { image, text };
 }
 
 /**

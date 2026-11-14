@@ -16,6 +16,13 @@ const NOW = new Date('2026-11-13T09:00:00Z');
 const QUESTS = await loadQuests([fileURLToPath(new URL('fixtures/quests/', import.meta.url))]);
 
 /**
+ * The path of a file in the fixture Quests, as a Reply's image refers to it.
+ */
+function fixture(path: string): string {
+	return fileURLToPath(new URL(`fixtures/quests/${path}`, import.meta.url));
+}
+
+/**
  * A Game with in-memory storage and the given Quests.
  */
 function newGame(quests: Quest[] = QUESTS): Game {
@@ -38,7 +45,10 @@ test('/quest start describes each Quest and offers it as a button, by name', () 
 	assert.deepEqual(reply.sections, [
 		{ text: 'Choose a Quest.' },
 		{ text: 'The Amber Road\nA pilgrimage along the old trade road.' },
-		{ text: 'The Clockwork Tower\nClimb a tower of gears before it strikes midnight.' },
+		{
+			image: fixture('clockwork-tower/tower.png'),
+			text: 'The Clockwork Tower\nClimb a tower of gears before it strikes midnight.',
+		},
 	]);
 	assert.deepEqual(
 		reply.buttons?.map((button) => button.label),
@@ -74,6 +84,7 @@ test('choosing a Quest lists its Characters, by name, with their descriptions, S
 			].join('\n'),
 		},
 		{
+			image: fixture('clockwork-tower/characters/tinker.PNG'),
 			text: [
 				'Tinker',
 				'Builds what the tower breaks.',

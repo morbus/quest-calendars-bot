@@ -37,6 +37,11 @@ export type QuestMetadata = {
 	 */
 	id: string;
 	/**
+	 * An image to show with it, such as a map or a portrait: a .gif, .jpeg, .jpg, .png, or .webp file,
+	 * relative to this file. Once loaded, the file's full path.
+	 */
+	image?: string;
+	/**
 	 * The name of the meter, such as "Notoriety", when the Quest turns on the meter Rule Module.
 	 */
 	meter?: string;
@@ -112,6 +117,11 @@ export type Character = {
 	 * Identifies the Character within its Quest: lowercase letters, digits, and hyphens.
 	 */
 	id: string;
+	/**
+	 * An image to show with it, such as a map or a portrait: a .gif, .jpeg, .jpg, .png, or .webp file,
+	 * relative to this file. Once loaded, the file's full path.
+	 */
+	image?: string;
 	/**
 	 * The Character's name, as Players see it.
 	 */
