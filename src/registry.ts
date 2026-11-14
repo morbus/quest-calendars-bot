@@ -2,7 +2,7 @@
  * The Quest registry: loads every Quest directory at startup and rejects invalid content.
  */
 
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -257,18 +257,26 @@ function withImage<T extends { image?: string }>(declared: T, file: string, ques
 	}
 	const path = resolve(dirname(file), image);
 	// A Quest is self-contained: its images stay in its directory, wherever that directory is.
-	if (isAbsolute(image) || relative(questDir, path).split(sep)[0] === '..') {
-		fail('image', "a path relative to this file, inside its Quest's directory", image);
-	}
+	const insideRule = "a path relative to this file, inside its Quest's directory";
+	if (isAbsolute(image) || isOutside(questDir, path)) fail('image', insideRule, image);
 	const stats = statSync(path, { throwIfNoEntry: false });
 	if (!stats?.isFile()) fail('image', 'a file at that path, relative to this one', image);
-	const maxSize = `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`;
+	// A symbolic link inside the Quest can still lead out of it.
+	if (isOutside(realpathSync(questDir), realpathSync(path))) fail('image', insideRule, image);
+	const maxSizeRule = `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`;
 	// Check the size before reading, so a huge file isn't read at all,
 	// and again after, in case the file was still being written.
-	if (stats.size > MAX_IMAGE_BYTES) fail('image', maxSize, image);
+	if (stats.size > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
 	const data = readFileSync(path);
-	if (data.length > MAX_IMAGE_BYTES) fail('image', maxSize, image);
+	if (data.length > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
 	return { ...rest, image: { data, name: basename(path) } };
+}
+
+/**
+ * Whether `path` is outside the directory `dir`.
+ */
+function isOutside(dir: string, path: string): boolean {
+	return relative(dir, path).split(sep)[0] === '..';
 }
 
 /**

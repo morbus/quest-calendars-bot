@@ -519,6 +519,19 @@ test("an absolute image path fails to load, even to a file in the Quest's own di
 	);
 });
 
+test("an image linked to a file outside its Quest's directory fails to load", async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await writeQuestWithImage(dir.path, 1);
+	await writeFile(join(dir.path, 'shared.png'), Buffer.alloc(1));
+	await symlink(join(dir.path, 'shared.png'), join(dir.path, 'quest-1', 'linked.png'));
+	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', { ...METADATA, image: 'linked.png' }));
+
+	await assert.rejects(
+		loadQuests([dir.path]),
+		/quest\.ts: image must be a path relative to this file, inside its Quest's directory, not "linked\.png"/,
+	);
+});
+
 test("a Character image elsewhere in its Quest's directory loads", async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	await writeQuestWithImage(dir.path, 1);
