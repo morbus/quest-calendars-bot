@@ -35,6 +35,11 @@ const MAX_CONTENT_LENGTH = 2000;
 const MAX_FILES = 10;
 
 /**
+ * What goes between two sections in one message: a blank line.
+ */
+const SECTION_BREAK = '\n\n';
+
+/**
  * Splits text into graphemes, the characters a reader sees, keeping emoji such as flags whole.
  */
 const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
@@ -175,7 +180,7 @@ export function toMessages(reply: Reply): Message[] {
 			const files = i === 0 && section.image !== undefined ? [section.image] : [];
 			const last = messages.at(-1);
 			if (last !== undefined && fitsIn(last, text, files)) {
-				last.content += `\n\n${text}`;
+				last.content += `${SECTION_BREAK}${text}`;
 				last.files.push(...files);
 			} else {
 				messages.push({ buttonRows: [], content: text, files });
@@ -190,12 +195,12 @@ export function toMessages(reply: Reply): Message[] {
 }
 
 /**
- * Whether `message` has room for `text`, after a blank line, and `files`.
+ * Whether `message` has room for `text`, after a {@link SECTION_BREAK}, and `files`.
  */
 function fitsIn(message: Message, text: string, files: Image[]): boolean {
 	const all = [...message.files, ...files];
 	return (
-		message.content.length + 2 + text.length <= MAX_CONTENT_LENGTH &&
+		message.content.length + SECTION_BREAK.length + text.length <= MAX_CONTENT_LENGTH &&
 		all.length <= MAX_FILES &&
 		bytes(all) <= MAX_IMAGE_BYTES
 	);
