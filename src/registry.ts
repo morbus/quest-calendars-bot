@@ -23,6 +23,11 @@ const MAX_ID_LENGTH = 64;
 const MAX_NAME_LENGTH = 80;
 
 /**
+ * The most Quests, which is the most buttons Discord shows in one message.
+ */
+const MAX_QUESTS = 25;
+
+/**
  * Dice to roll, such as "d6" or "2d4".
  */
 const DICE = /^([1-9]\d*)?d[1-9]\d*$/;
@@ -48,6 +53,9 @@ export async function loadQuests(dirs: string[]): Promise<Quest[]> {
 	const questNames = new Map<string, string>();
 	for (const dir of dirs) {
 		quests.push(...(await loadQuestDirs(dir, questIds, questNames)));
+	}
+	if (quests.length > MAX_QUESTS) {
+		throw new Error(`${quests.length} Quests are more than the ${MAX_QUESTS} /quest start can show`);
 	}
 	return quests.sort(byName);
 }

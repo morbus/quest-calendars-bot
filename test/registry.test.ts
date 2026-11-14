@@ -407,3 +407,20 @@ test('two Quests with the same id in different directories fail to load', async 
 
 	await assert.rejects(loadQuests([first.path, second.path]), /id amber-road is already used by/);
 });
+
+/**
+ * `count` valid Quests, each with its own id and name.
+ */
+function questsNumbered(count: number): QuestFiles[] {
+	return Array.from({ length: count }, (_, i) => ({
+		metadata: { ...METADATA, id: `quest-${i + 1}`, name: `Quest ${i + 1}` },
+	}));
+}
+
+test('25 Quests load, as many as /quest start can show as buttons', async () => {
+	await assert.doesNotReject(load(questsNumbered(25)));
+});
+
+test('more than 25 Quests fail to load', async () => {
+	await assert.rejects(load(questsNumbered(26)), /26 Quests are more than the 25 \/quest start can show/);
+});
