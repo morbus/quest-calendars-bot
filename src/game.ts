@@ -140,27 +140,42 @@ export function createGame({ quests, storage }: { quests: Quest[]; storage: Stor
 		handle(_playerId, _serverId, input, _now) {
 			return storage.transaction(() => {
 				if ('command' in input) return { reply: showQuest(quests, 0) };
-				const questPage = /^(?:prev|next):quests:(\d+)$/.exec(input.button);
-				if (questPage) return { reply: showQuest(quests, page(questPage[1], quests, input.button)) };
-				const characterPage = /^(?:prev|next):characters:([a-z0-9-]+):(\d+)$/.exec(input.button);
-				if (characterPage) {
-					const quest = quests.find((quest) => quest.id === characterPage[1]);
-					if (!quest) throw new Error(`Unknown button: ${input.button}`);
-					return { reply: showCharacter(quest, page(characterPage[2], quest.characters, input.button)) };
-				}
-				const chosen = /^character:([a-z0-9-]+):(\d+)$/.exec(input.button);
-				if (chosen) {
-					const quest = quests.find((quest) => quest.id === chosen[1]);
-					if (!quest) throw new Error(`Unknown button: ${input.button}`);
-					page(chosen[2], quest.characters, input.button);
-					return { reply: { sections: [{ text: 'Starting a Quest is coming soon.' }] } };
-				}
-				const quest = quests.find((quest) => questButtonId(quest) === input.button);
-				if (!quest) throw new Error(`Unknown button: ${input.button}`);
-				return { reply: showCharacter(quest, 0) };
+				return { reply: pressButton(quests, input.button) };
 			});
 		},
 	};
+}
+
+/**
+ * What pressing the button with id `button` shows.
+ *
+ * @throws When no button has that id, such as one left from before the Quests changed.
+ */
+function pressButton(quests: Quest[], button: string): Reply {
+	const [kind, ...args] = button.split(':');
+	const unknown = new Error(`Unknown button: ${button}`);
+	const questWithId = (id: string | undefined): Quest => {
+		const quest = quests.find((quest) => quest.id === id);
+		if (quest === undefined) throw unknown;
+		return quest;
+	};
+	const indexIn = (digits: string | undefined, items: unknown[]): number => {
+		const index = Number(digits);
+		if (!/^\d+$/.test(digits ?? '') || index >= items.length) throw unknown;
+		return index;
+	};
+	const paging = kind === 'prev' || kind === 'next';
+	if (kind === 'quest' && args.length === 1) return showCharacter(questWithId(args[0]), 0);
+	if (paging && args[0] === 'quests' && args.length === 2) return showQuest(quests, indexIn(args[1], quests));
+	if (paging && args[0] === 'characters' && args.length === 3) {
+		const quest = questWithId(args[1]);
+		return showCharacter(quest, indexIn(args[2], quest.characters));
+	}
+	if (kind === 'character' && args.length === 2) {
+		indexIn(args[1], questWithId(args[0]).characters);
+		return { sections: [{ text: 'Starting a Quest is coming soon.' }] };
+	}
+	throw unknown;
 }
 
 /**
@@ -191,17 +206,6 @@ function pageButtons(list: string, index: number, count: number): [Button, Butto
 		{ disabled, id: `prev:${list}:${(index - 1 + count) % count}`, label: 'Previous' },
 		{ disabled, id: `next:${list}:${(index + 1) % count}`, label: 'Next' },
 	];
-}
-
-/**
- * The page a button's id leads to in `items`.
- *
- * @throws When there's no such page, such as after the Quests changed.
- */
-function page(digits: string | undefined, items: unknown[], button: string): number {
-	const index = Number(digits);
-	if (!(index < items.length)) throw new Error(`Unknown button: ${button}`);
-	return index;
 }
 
 /**
