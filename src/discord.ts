@@ -43,7 +43,7 @@ const SECTION_BREAK = '\n\n';
 /**
  * The most characters Discord shows in each part of an embed, and in all of them together.
  */
-const EMBED_LIMITS = { description: 4096, fieldName: 256, fieldValue: 1024, footer: 2048, title: 256, total: 6000 };
+const EMBED_LIMITS = { description: 4096, fieldValue: 1024, total: 6000 };
 
 /**
  * Splits text into graphemes, the characters a reader sees, keeping emoji such as flags whole.
@@ -299,21 +299,16 @@ export function toDiscord({ buttonRows, card, content, files }: Message) {
  * Text too long for an embed is cut short with an ellipsis. When the parts together are too long,
  * the description gives way, since the name, Stats, Traits, and Abilities matter more.
  */
-function toEmbed(card: Card): EmbedBuilder {
-	const title = clip(card.title, EMBED_LIMITS.title);
-	const footer = clip(card.footer, EMBED_LIMITS.footer);
-	const fields = card.fields.map(({ name, value }) => ({
-		name: clip(name, EMBED_LIMITS.fieldName),
-		value: clip(value, EMBED_LIMITS.fieldValue),
-	}));
-	const used = [title, footer, ...fields.flatMap(({ name, value }) => [name, value])].join('').length;
-	const description = clip(card.description, Math.min(EMBED_LIMITS.description, EMBED_LIMITS.total - used));
+function toEmbed({ description, fields, footer, image, title }: Card): EmbedBuilder {
+	// The title, footer, and field names are short by construction, so only the authored text needs cutting.
+	const clipped = fields.map(({ name, value }) => ({ name, value: clip(value, EMBED_LIMITS.fieldValue) }));
+	const used = [title, footer, ...clipped.flatMap(({ name, value }) => [name, value])].join('').length;
 	const embed = new EmbedBuilder()
 		.setTitle(title)
-		.setDescription(description)
-		.addFields(fields)
+		.setDescription(clip(description, Math.min(EMBED_LIMITS.description, EMBED_LIMITS.total - used)))
+		.addFields(clipped)
 		.setFooter({ text: footer });
-	return card.image === undefined ? embed : embed.setImage(`attachment://${attachmentName(card.image.name)}`);
+	return image === undefined ? embed : embed.setImage(`attachment://${attachmentName(image.name)}`);
 }
 
 /**

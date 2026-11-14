@@ -19,7 +19,7 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const MAX_ID_LENGTH = 64;
 
 /**
- * The longest Quest or Character name, which is Discord's limit for a button label.
+ * The longest Quest or Character name, short enough to show whole as an embed's title and in its footer.
  */
 const MAX_NAME_LENGTH = 80;
 
