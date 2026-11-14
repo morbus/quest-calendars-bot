@@ -258,3 +258,22 @@ test('a card whose parts each fit but together pass 6000 characters has its desc
 	assert.equal(length, 6000);
 	assert.ok(embed.description.endsWith('…'));
 });
+
+test("a card whose image doesn't fit with the last message's images starts a new message", () => {
+	const sections = Array.from({ length: 10 }, (_, i) => ({ image: image(`${i + 1}.png`), text: `${i + 1}` }));
+	const card = { description: 'Climb.', fields: [], footer: 'Quest 1 of 1', image: image('tower.png'), title: 'Tower' };
+
+	const messages = toMessages({ buttons: buttons(1), card, sections });
+
+	assert.deepEqual(
+		messages.map((message) => ({
+			buttons: message.buttonRows.length,
+			card: message.card?.title,
+			files: message.files.length,
+		})),
+		[
+			{ buttons: 0, card: undefined, files: 10 },
+			{ buttons: 1, card: 'Tower', files: 1 },
+		],
+	);
+});

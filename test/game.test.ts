@@ -201,7 +201,7 @@ test('choosing a Character says starting a Quest is coming soon', () => {
 	assert.deepEqual(reply, { sections: [{ text: 'Starting a Quest is coming soon.' }] });
 });
 
-test('a page button for a page that does not exist is an error', () => {
+test('a button for a page or choice that does not exist is an error', () => {
 	const game = newGame();
 
 	for (const button of [
@@ -209,6 +209,8 @@ test('a page button for a page that does not exist is an error', () => {
 		'next:characters:amber-road:1',
 		'next:characters:nowhere:0',
 		'character:amber-road:1',
+		'next:quests:',
+		'quest:amber-road:extra',
 	]) {
 		assert.throws(() => game.handle('player-1', 'server-1', { button }, NOW), new RegExp(`Unknown button: ${button}`));
 	}
