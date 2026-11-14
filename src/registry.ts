@@ -270,10 +270,12 @@ function withImage<T extends { image?: string }>(declared: T, file: string): Loa
 /**
  * Accepts a Quest or Character id.
  *
- * @throws When it isn't lowercase letters, digits, and hyphens, or is too long.
+ * @throws When it isn't lowercase letters and digits with single hyphens between them, or is too long.
  */
 function checkId(id: unknown): void {
-	if (typeof id !== 'string' || !ID.test(id)) fail('id', 'lowercase letters, digits, and hyphens', id);
+	if (typeof id !== 'string' || !ID.test(id)) {
+		fail('id', 'lowercase letters and digits, with single hyphens between them', id);
+	}
 	if (id.length > MAX_ID_LENGTH) fail('id', `at most ${MAX_ID_LENGTH} characters`, id);
 }
 

@@ -33,7 +33,7 @@ export type QuestMetadata = {
 	 */
 	description: string;
 	/**
-	 * Identifies the Quest for as long as it exists: lowercase letters, digits, and hyphens.
+	 * Identifies the Quest for as long as it exists: lowercase letters and digits, with single hyphens between them.
 	 */
 	id: string;
 	/**
@@ -114,7 +114,7 @@ export type Character = {
 	 */
 	description: string;
 	/**
-	 * Identifies the Character within its Quest: lowercase letters, digits, and hyphens.
+	 * Identifies the Character within its Quest: lowercase letters and digits, with single hyphens between them.
 	 */
 	id: string;
 	/**

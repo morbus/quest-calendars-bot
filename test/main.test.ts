@@ -91,5 +91,8 @@ test('startup fails, naming the file, when a Quest in any QUESTS_DIR directory i
 
 	assert.equal(code, 1);
 	assert.match(output, /Quests can't be loaded/);
-	assert.match(output, /nameless\/quest\.ts: id must be lowercase letters, digits, and hyphens, not undefined/);
+	assert.match(
+		output,
+		/nameless\/quest\.ts: id must be lowercase letters and digits, with single hyphens between them, not undefined/,
+	);
 });
