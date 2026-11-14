@@ -14,6 +14,8 @@ quests/
       warden.ts
 ```
 
+Quest directories and Character files whose names start with `.` are skipped.
+
 `quest()` and `character()` come from `src/builder.ts`, whose types list every field.
 `npm run typecheck` checks each field as you write it, and startup checks every field again.
 
@@ -37,12 +39,13 @@ export default quest({
 - `complete`: `true` once you've finished writing the Quest.
 - `currency`: what the Quest's Currency is called, such as "gold" or "scrap".
 - `description`: what Players read before they choose the Quest.
-- `id`: lowercase letters, digits, and hyphens, such as `clockwork-tower`, at most 64 characters. Keep it once Players have played the Quest.
+- `id`: lowercase letters and digits, with single hyphens between them, such as `clockwork-tower`, at most 64 characters. Keep it once Players have played the Quest.
 - `image` (optional): see [Images](#images).
 - `meter`: the meter's name, such as "Notoriety". Give one exactly when `ruleModules` turns on `meter`.
 - `name`: what Players see, on one line of at most 80 characters.
 - `ruleModules`: the optional Rule Modules the Quest turns on, each at most once: `exploration`, `meal-rations`, and `meter`. Use `[]` for none.
 
+Every text, such as a name, a description, or the `currency`, must hold more than spaces.
 No two Quests may share an id or a name, even across the directories QUESTS_DIR lists.
 `/quest start` shows at most 25 Quests, so the bot won't start with more.
 
@@ -77,5 +80,3 @@ export default character({
 A Quest or a Character can show an image, such as a map or a portrait.
 `image` names a `.gif`, `.jpeg`, `.jpg`, `.png`, or `.webp` file relative to the file that names it, of at most 8 MiB, the most Discord takes in one message.
 The bot reads images when it starts, so restart it after you change one.
-
-Files and directories whose names start with `.` are skipped.
