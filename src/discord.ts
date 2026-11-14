@@ -41,7 +41,7 @@ const MAX_FILES = 10;
 const SECTION_BREAK = '\n\n';
 
 /**
- * The most characters Discord shows in each part of an embed the bot cuts, and in all of them together.
+ * The most characters Discord shows in each part of an embed the bot cuts, and in the whole embed.
  */
 const EMBED_LIMITS = { description: 4096, fieldValue: 1024, total: 6000 };
 

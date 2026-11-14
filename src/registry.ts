@@ -291,7 +291,7 @@ function checkId(id: unknown): void {
 }
 
 /**
- * Accepts a Quest or Character name, which Players see as a card's title and in its footer.
+ * Accepts a Quest or Character name, which Players see as an embed's title and in its footer.
  *
  * @throws When it isn't one line of text of at most {@link MAX_NAME_LENGTH} characters.
  */
