@@ -528,8 +528,20 @@ test("an image linked to a file outside its Quest's directory fails to load", as
 
 	await assert.rejects(
 		loadQuests([dir.path]),
-		/quest\.ts: image must be a path relative to this file, inside its Quest's directory, not "linked\.png"/,
+		/quest\.ts: image must be a file inside its Quest's directory, without a symbolic link leading out, not "linked\.png"/,
 	);
+});
+
+test("an image linked to another file in its Quest's directory loads, under the link's name", async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await writeQuestWithImage(dir.path, 1);
+	await writeFile(join(dir.path, 'quest-1', 'map.png'), 'map bytes');
+	await symlink('map.png', join(dir.path, 'quest-1', 'linked.png'));
+	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', { ...METADATA, image: 'linked.png' }));
+
+	const [quest] = await loadQuests([dir.path]);
+
+	assert.deepEqual(quest?.image, { data: Buffer.from('map bytes'), name: 'linked.png' });
 });
 
 test("a Character image elsewhere in its Quest's directory loads", async () => {

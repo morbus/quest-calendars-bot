@@ -257,17 +257,22 @@ function withImage<T extends { image?: string }>(declared: T, file: string, ques
 	}
 	const path = resolve(dirname(file), image);
 	// A Quest is self-contained: its images stay in its directory, wherever that directory is.
-	const insideRule = "a path relative to this file, inside its Quest's directory";
-	if (isAbsolute(image) || isOutside(questDir, path)) fail('image', insideRule, image);
+	if (isAbsolute(image) || isOutside(questDir, path)) {
+		fail('image', "a path relative to this file, inside its Quest's directory", image);
+	}
 	const stats = statSync(path, { throwIfNoEntry: false });
 	if (!stats?.isFile()) fail('image', 'a file at that path, relative to this one', image);
-	// A symbolic link inside the Quest can still lead out of it.
-	if (isOutside(realpathSync(questDir), realpathSync(path))) fail('image', insideRule, image);
+	// A symbolic link inside the Quest can still lead out of it. Reading the resolved path,
+	// not the link, means a link changed after this check can't swap in another file.
+	const realPath = realpathSync(path);
+	if (isOutside(realpathSync(questDir), realPath)) {
+		fail('image', "a file inside its Quest's directory, without a symbolic link leading out", image);
+	}
 	const maxSizeRule = `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`;
 	// Check the size before reading, so a huge file isn't read at all,
 	// and again after, in case the file was still being written.
 	if (stats.size > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
-	const data = readFileSync(path);
+	const data = readFileSync(realPath);
 	if (data.length > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
 	return { ...rest, image: { data, name: basename(path) } };
 }
