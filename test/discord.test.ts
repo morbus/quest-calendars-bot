@@ -98,3 +98,22 @@ test('a section split at 2000 characters keeps each emoji whole', () => {
 		[`a${'🐉'.repeat(999)}`, '🐉'.repeat(501)],
 	);
 });
+
+test('a section split at 2000 characters keeps emoji made of several characters whole, such as flags', () => {
+	const messages = toMessages({ sections: [{ text: `a${'🇫🇷'.repeat(600)}` }] });
+
+	assert.deepEqual(
+		messages.map((message) => message.content),
+		[`a${'🇫🇷'.repeat(499)}`, '🇫🇷'.repeat(101)],
+	);
+});
+
+test('a single character longer than a message is cut at 2000', () => {
+	// One letter with 2500 accents is one character as a reader sees it.
+	const messages = toMessages({ sections: [{ text: `e${'́'.repeat(2500)}` }] });
+
+	assert.deepEqual(
+		messages.map((message) => message.content.length),
+		[2000, 501],
+	);
+});

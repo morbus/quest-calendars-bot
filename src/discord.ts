@@ -34,6 +34,11 @@ const MAX_CONTENT_LENGTH = 2000;
 const MAX_FILES = 10;
 
 /**
+ * Splits text into characters as a reader sees them, keeping emoji such as flags whole.
+ */
+const CHARACTERS = new Intl.Segmenter('en', { granularity: 'grapheme' });
+
+/**
  * One Discord message of a {@link Reply}, before discord.js builds it.
  */
 export type Message = {
@@ -184,22 +189,33 @@ export function toMessages(reply: Reply): Message[] {
 }
 
 /**
- * Splits `text` into pieces of at most 2000 characters, at the last line break that fits, or else at 2000
- * (or 1999, to keep an emoji whole).
+ * Splits `text` into pieces of at most 2000 characters, at the last line break that fits, or else
+ * at the last whole character that fits, so an emoji such as a flag is never cut in two.
  */
 function splitText(text: string): string[] {
 	const pieces: string[] = [];
 	let rest = text;
 	while (rest.length > MAX_CONTENT_LENGTH) {
 		const lineBreak = rest.lastIndexOf('\n', MAX_CONTENT_LENGTH);
-		let end = lineBreak > 0 ? lineBreak : MAX_CONTENT_LENGTH;
-		// Don't cut between the two halves of a character such as an emoji.
-		if (/[\uD800-\uDBFF]/.test(rest.charAt(end - 1))) end -= 1;
+		const end = lineBreak > 0 ? lineBreak : lastCharacterBreak(rest);
 		pieces.push(rest.slice(0, end));
 		rest = rest.slice(lineBreak > 0 ? end + 1 : end);
 	}
 	pieces.push(rest);
 	return pieces;
+}
+
+/**
+ * Where the last whole character, as a reader sees one, that fits in 2000 characters of `text` ends.
+ */
+function lastCharacterBreak(text: string): number {
+	let end = 0;
+	for (const { index } of CHARACTERS.segment(text)) {
+		if (index > MAX_CONTENT_LENGTH) break;
+		end = index;
+	}
+	// A single character longer than a message can only be cut.
+	return end > 0 ? end : MAX_CONTENT_LENGTH;
 }
 
 /**
