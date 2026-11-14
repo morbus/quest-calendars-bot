@@ -4,7 +4,7 @@
 
 import { readFileSync, statSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RULE_MODULES, TRAITS, type Character, type QuestMetadata } from './builder.ts';
 
@@ -106,7 +106,7 @@ async function loadQuestsIn(dir: string, claims: Claims): Promise<Quest[]> {
 		// stat() follows a symbolic link, so a linked Quest directory loads too.
 		if (entry.startsWith('.') || !(await stat(questDir)).isDirectory()) continue;
 		const metadataFile = join(questDir, 'quest.ts');
-		const metadata = await loadFile(metadataFile, checkMetadata);
+		const metadata = await loadFile(metadataFile, (value) => checkMetadata(value, metadataFile, questDir));
 		claim(claims, metadata, metadataFile);
 		const characters: Loaded<Character>[] = [];
 		const characterClaims = newClaims();
@@ -117,7 +117,7 @@ async function loadQuestsIn(dir: string, claims: Claims): Promise<Quest[]> {
 		for (const name of characterFiles) {
 			if (name.startsWith('.') || !name.endsWith('.ts')) continue;
 			const file = join(questDir, 'characters', name);
-			const character = await loadFile(file, checkCharacter);
+			const character = await loadFile(file, (value) => checkCharacter(value, file, questDir));
 			claim(characterClaims, character, file);
 			characters.push(character);
 		}
@@ -176,20 +176,20 @@ function claim(claims: Claims, { id, name }: { id: string; name: string }, file:
  *
  * @throws When the file can't be imported or `check` rejects it, naming the file.
  */
-async function loadFile<T>(file: string, check: (value: unknown, file: string) => T): Promise<T> {
+async function loadFile<T>(file: string, check: (value: unknown) => T): Promise<T> {
 	try {
-		return check((await import(pathToFileURL(file).href)).default, file);
+		return check((await import(pathToFileURL(file).href)).default);
 	} catch (error) {
 		throw new Error(`${file}: ${error instanceof Error ? error.message : error}`, { cause: error });
 	}
 }
 
 /**
- * Accepts valid Quest metadata from `file`, with its image read.
+ * Accepts valid Quest metadata from `file`, in `questDir`, with its image read.
  *
  * @throws When it isn't.
  */
-function checkMetadata(value: unknown, file: string): Loaded<QuestMetadata> {
+function checkMetadata(value: unknown, file: string, questDir: string): Loaded<QuestMetadata> {
 	checkObject('the default export', value);
 	const metadata = value as QuestMetadata;
 	checkId(metadata.id);
@@ -210,15 +210,15 @@ function checkMetadata(value: unknown, file: string): Loaded<QuestMetadata> {
 		checkText('meter', metadata.meter);
 	}
 	if (hasMeter && metadata.meter === undefined) throw new Error('ruleModules turns on meter, but meter has no name');
-	return withImage(metadata, file);
+	return withImage(metadata, file, questDir);
 }
 
 /**
- * Accepts a valid Character from `file`, with its image read.
+ * Accepts a valid Character from `file`, in `questDir`, with its image read.
  *
  * @throws When it isn't.
  */
-function checkCharacter(value: unknown, file: string): Loaded<Character> {
+function checkCharacter(value: unknown, file: string, questDir: string): Loaded<Character> {
 	checkObject('the default export', value);
 	const character = value as Character;
 	checkId(character.id);
@@ -238,24 +238,28 @@ function checkCharacter(value: unknown, file: string): Loaded<Character> {
 		checkText(`abilities[${i}].name`, ability.name);
 		checkText(`abilities[${i}].text`, ability.text);
 	}
-	return withImage(character, file);
+	return withImage(character, file, questDir);
 }
 
 /**
- * `declared`, with its image, if any, read from its path relative to `file`.
+ * `declared`, with its image, if any, read from its path relative to `file`, which must stay in `questDir`.
  *
  * @remarks
  * Reading it now means a reply still shows it if the file moves while the bot runs.
  *
- * @throws When the image isn't an image file, doesn't exist, or is too large for Discord.
+ * @throws When the image isn't an image file, is outside `questDir`, doesn't exist, or is too large for Discord.
  */
-function withImage<T extends { image?: string }>(declared: T, file: string): Loaded<T> {
+function withImage<T extends { image?: string }>(declared: T, file: string, questDir: string): Loaded<T> {
 	const { image, ...rest } = declared;
 	if (image === undefined) return rest;
 	if (typeof image !== 'string' || !IMAGE_EXTENSIONS.includes(extname(image).toLowerCase())) {
 		fail('image', `a ${IMAGE_EXTENSIONS.slice(0, -1).join(', ')}, or ${IMAGE_EXTENSIONS.at(-1)} file`, image);
 	}
 	const path = resolve(dirname(file), image);
+	// A Quest is self-contained: its images stay in its directory, wherever that directory is.
+	if (isAbsolute(image) || relative(questDir, path).split(sep)[0] === '..') {
+		fail('image', "a path relative to this file, inside its Quest's directory", image);
+	}
 	const stats = statSync(path, { throwIfNoEntry: false });
 	if (!stats?.isFile()) fail('image', 'a file at that path, relative to this one', image);
 	const maxSize = `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`;

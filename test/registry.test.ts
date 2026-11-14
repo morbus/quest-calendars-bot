@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Character, QuestMetadata } from '../src/builder.ts';
-import { loadQuests } from '../src/registry.ts';
+import { loadQuests, type Quest } from '../src/registry.ts';
 
 /**
  * The builder API, as the Quest files written by {@link load} import it.
@@ -320,6 +320,18 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 		error: /quest\.ts: image must be a \.gif, \.jpeg, \.jpg, \.png, or \.webp file, not 5/,
 	},
 	{
+		name: 'a Quest image at an absolute path',
+		quest: { metadata: { ...METADATA, image: '/srv/art/map.png' } },
+		error:
+			/quest\.ts: image must be a path relative to this file, inside its Quest's directory, not "\/srv\/art\/map\.png"/,
+	},
+	{
+		name: "a Character image outside its Quest's directory",
+		quest: { characters: [{ ...CHARACTER, image: '../../shared/map.png' }] },
+		error:
+			/character-1\.ts: image must be a path relative to this file, inside its Quest's directory, not "\.\.\/\.\.\/shared\/map\.png"/,
+	},
+	{
 		name: 'a Character image that does not exist',
 		quest: { characters: [{ ...CHARACTER, image: 'missing.png' }] },
 		error: /character-1\.ts: image must be a file at that path, relative to this one, not "missing\.png"/,
@@ -493,6 +505,31 @@ test('an image of 8 MiB loads', async () => {
 
 test('an image over 8 MiB, more than Discord takes in a message, fails to load', async () => {
 	await assert.rejects(loadWithImage(8 * 1024 * 1024 + 1), /quest\.ts: image must be at most 8 MiB, not "map\.png"/);
+});
+
+test("an absolute image path fails to load, even to a file in the Quest's own directory", async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await writeQuestWithImage(dir.path, 1);
+	const image = join(dir.path, 'quest-1', 'map.png');
+	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', { ...METADATA, image }));
+
+	await assert.rejects(
+		loadQuests([dir.path]),
+		/quest\.ts: image must be a path relative to this file, inside its Quest's directory/,
+	);
+});
+
+test("a Character image elsewhere in its Quest's directory loads", async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await writeQuestWithImage(dir.path, 1);
+	const characterFile = join(dir.path, 'quest-1', 'characters', 'pilgrim.ts');
+	// A name that starts with two dots is still inside the Quest's directory.
+	await writeFile(join(dir.path, 'quest-1', '..map.png'), Buffer.alloc(2));
+	await writeFile(characterFile, source('character', { ...CHARACTER, image: '../..map.png' }));
+
+	const [quest] = (await loadQuests([dir.path])) as Quest[];
+
+	assert.deepEqual(quest?.characters[0]?.image, { data: Buffer.alloc(2), name: '..map.png' });
 });
 
 test('an image too large to read, such as one over 2 GiB, fails to load with the 8 MiB rule', async () => {
