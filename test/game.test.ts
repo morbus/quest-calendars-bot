@@ -39,7 +39,7 @@ test('/quest start says Quests are coming soon when there are none', () => {
 	assert.deepEqual(reply.sections, [{ text: 'Quests are coming soon.' }]);
 });
 
-test('/quest start shows the first Quest on its own, with buttons to choose it or page through the rest', () => {
+test('/quest start shows the first Quest on its own, with buttons to choose it or move through the rest', () => {
 	const game = newGame();
 
 	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
@@ -106,7 +106,7 @@ test('Previous on the first Quest wraps around to the last, and Next on the last
 });
 
 /**
- * Pages through `/quest start` to the Quest named `name`, chooses it, and returns what the Player sees.
+ * Moves through `/quest start` to the Quest named `name`, chooses it, and returns what the Player sees.
  */
 function chooseQuest(game: Game, name: string): Reply {
 	let { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
@@ -201,7 +201,7 @@ test('choosing a Character says starting a Quest is coming soon', () => {
 	assert.deepEqual(reply, { sections: [{ text: 'Starting a Quest is coming soon.' }] });
 });
 
-test('a button for a page or choice that does not exist is an error', () => {
+test('a button for a Quest or Character that does not exist is an error', () => {
 	const game = newGame();
 
 	for (const button of [

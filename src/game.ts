@@ -91,7 +91,7 @@ export type Section = {
  */
 export type Button = {
 	/**
-	 * Whether it is shown but can't be pressed, such as Previous on the first page.
+	 * Whether it is shown but can't be pressed, such as Previous when there's only one Quest.
 	 */
 	disabled?: boolean;
 	/**
@@ -164,10 +164,10 @@ function pressButton(quests: Quest[], button: string): Reply {
 		if (!/^\d+$/.test(digits ?? '') || index >= items.length) throw unknown;
 		return index;
 	};
-	const paging = kind === 'prev' || kind === 'next';
+	const browsing = kind === 'prev' || kind === 'next';
 	if (kind === 'quest' && args.length === 1) return showCharacter(questWithId(args[0]), 0);
-	if (paging && args[0] === 'quests' && args.length === 2) return showQuest(quests, indexIn(args[1], quests));
-	if (paging && args[0] === 'characters' && args.length === 3) {
+	if (browsing && args[0] === 'quests' && args.length === 2) return showQuest(quests, indexIn(args[1], quests));
+	if (browsing && args[0] === 'characters' && args.length === 3) {
 		const quest = questWithId(args[1]);
 		return showCharacter(quest, indexIn(args[2], quest.characters));
 	}
@@ -179,13 +179,13 @@ function pressButton(quests: Quest[], button: string): Reply {
 }
 
 /**
- * Shows the Quest at `index` on its own, with buttons to choose it or page to the others,
+ * Shows the Quest at `index` on its own, with buttons to choose it or move to the others,
  * or says none are ready yet.
  */
 function showQuest(quests: Quest[], index: number): Reply {
 	const quest = quests[index];
 	if (quest === undefined) return { sections: [{ text: 'Quests are coming soon.' }] };
-	const [previous, next] = pageButtons('quests', index, quests.length);
+	const [previous, next] = browseButtons('quests', index, quests.length);
 	return {
 		buttons: [previous, { id: questButtonId(quest), label: 'Choose this Quest' }, next],
 		card: card(quest, quest.description, [], `Quest ${index + 1} of ${quests.length}`),
@@ -194,13 +194,13 @@ function showQuest(quests: Quest[], index: number): Reply {
 }
 
 /**
- * Previous and Next buttons for page `index` of `count`, whose ids lead to the page before and after it,
- * wrapping around at either end. Both are disabled when there's only one page.
+ * Previous and Next buttons for item `index` of `count`, whose ids lead to the one before and after it,
+ * wrapping around at either end. Both are disabled when there's only one.
  *
  * @remarks
- * Each id starts with its direction, so the two differ even when they lead to the same page.
+ * Each id starts with its direction, so the two differ even when they lead to the same one.
  */
-function pageButtons(list: string, index: number, count: number): [Button, Button] {
+function browseButtons(list: string, index: number, count: number): [Button, Button] {
 	const disabled = count === 1;
 	return [
 		{ disabled, id: `prev:${list}:${(index - 1 + count) % count}`, label: 'Previous' },
@@ -217,12 +217,12 @@ function questButtonId(quest: Quest): string {
 
 /**
  * Shows the Character at `index` in `quest` on its own, with their Stats, Traits, and Abilities,
- * and buttons to choose them or page to the others.
+ * and buttons to choose them or move to the others.
  */
 function showCharacter(quest: Quest, index: number): Reply {
 	const character = quest.characters[index]!;
 	const count = quest.characters.length;
-	const [previous, next] = pageButtons(`characters:${quest.id}`, index, count);
+	const [previous, next] = browseButtons(`characters:${quest.id}`, index, count);
 	return {
 		buttons: [previous, { id: `character:${quest.id}:${index}`, label: 'Choose this Character' }, next],
 		card: card(
