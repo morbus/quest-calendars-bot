@@ -257,7 +257,7 @@ function withImage<T extends { image?: string }>(declared: T, file: string): Loa
 	}
 	const path = resolve(dirname(file), image);
 	const stats = statSync(path, { throwIfNoEntry: false });
-	if (!stats?.isFile()) fail('image', 'a file beside this one', image);
+	if (!stats?.isFile()) fail('image', 'a file at that path, relative to this one', image);
 	const tooLarge = `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`;
 	// Check the size before reading, so a huge file isn't read at all,
 	// and again after, in case the file was still being written.

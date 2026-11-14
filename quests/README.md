@@ -17,7 +17,8 @@ quests/
 Quest directories and Character files whose names start with `.` are skipped.
 
 `quest()` and `character()` come from `src/builder.ts`, whose types list every field.
-`npm run typecheck` checks each field as you write it, and startup checks every field again.
+`npm run typecheck` checks each field of a Quest in `quests/` as you write it, and startup checks every field of every Quest again.
+A Quest in another directory imports `src/builder.ts` from where this project is, and only startup checks it.
 
 ## quest.ts
 

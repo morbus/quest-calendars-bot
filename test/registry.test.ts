@@ -315,7 +315,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'a Character image that does not exist',
 		quest: { characters: [{ ...CHARACTER, image: 'missing.png' }] },
-		error: /character-1\.ts: image must be a file beside this one, not "missing\.png"/,
+		error: /character-1\.ts: image must be a file at that path, relative to this one, not "missing\.png"/,
 	},
 	{
 		name: 'a Rule Module turned on twice',
