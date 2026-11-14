@@ -93,14 +93,11 @@ test('a Character with no Abilities says so', () => {
 	]);
 });
 
-test('choosing a Quest that is gone since the list was shown says it is no longer available', () => {
-	const before = newGame();
-	const { reply } = before.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
-	const amberRoad = reply.buttons?.find((button) => button.label === 'The Amber Road');
-	assert.ok(amberRoad);
-	const after = newGame(QUESTS.filter((quest) => quest.name !== 'The Amber Road'));
+test('a button for a Quest that does not exist is an error', () => {
+	const game = newGame();
 
-	const { reply: pressed } = after.handle('player-1', 'server-1', { button: amberRoad.id }, NOW);
-
-	assert.deepEqual(pressed.sections, ['That Quest is no longer available. Use /quest start to see the Quests.']);
+	assert.throws(
+		() => game.handle('player-1', 'server-1', { button: 'quest:nowhere' }, NOW),
+		/Unknown button: quest:nowhere/,
+	);
 });

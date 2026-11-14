@@ -79,8 +79,7 @@ export function createGame({ quests, storage }: { quests: Quest[]; storage: Stor
 			return storage.transaction(() => {
 				if ('command' in input) return { reply: listQuests(quests) };
 				const quest = quests.find((quest) => questButtonId(quest) === input.button);
-				if (!quest)
-					return { reply: { sections: ['That Quest is no longer available. Use /quest start to see the Quests.'] } };
+				if (!quest) throw new Error(`Unknown button: ${input.button}`);
 				return { reply: listCharacters(quest) };
 			});
 		},
