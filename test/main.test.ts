@@ -2,15 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempDisposable, readFile } from 'node:fs/promises';
+import { mkdir, mkdtempDisposable, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
  * The CLI entry point, as `npm start` runs it.
  */
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
+
+/**
+ * The project folder, which relative QUESTS_DIR entries resolve against.
+ */
+const PROJECT = fileURLToPath(new URL('..', import.meta.url));
 
 /**
  * Where the bot writes its log: in the project's logs/, wherever it's started from.
@@ -34,12 +39,12 @@ test('startup fails, naming each missing variable, when none are set', async () 
 	const { code, output } = await start({});
 
 	assert.equal(code, 1);
-	assert.match(output, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE(?!,)/);
+	assert.match(output, /Missing environment variables: DISCORD_TOKEN, GAME_TIMEZONE, QUESTS_DIR(?!,)/);
 	assert.doesNotMatch(output, /Opened game state/);
 });
 
-test('startup fails, naming only GAME_TIMEZONE, when the token is set', async () => {
-	const { code, output } = await start({ DISCORD_TOKEN: 'token' });
+test('startup fails, naming only GAME_TIMEZONE, when the token and Quest directories are set', async () => {
+	const { code, output } = await start({ DISCORD_TOKEN: 'token', QUESTS_DIR: 'quests' });
 
 	assert.equal(code, 1);
 	assert.match(output, /Missing environment variables: GAME_TIMEZONE(?!,)/);
@@ -48,7 +53,11 @@ test('startup fails, naming only GAME_TIMEZONE, when the token is set', async ()
 });
 
 test('startup fails when the timezone is not a real one', async () => {
-	const { code, output } = await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'Mars/Olympus_Mons' });
+	const { code, output } = await start({
+		DISCORD_TOKEN: 'token',
+		GAME_TIMEZONE: 'Mars/Olympus_Mons',
+		QUESTS_DIR: 'quests',
+	});
 
 	assert.equal(code, 1);
 	assert.match(output, /GAME_TIMEZONE is not a valid timezone: Mars\/Olympus_Mons/);
@@ -60,7 +69,7 @@ test("startup writes its log lines to the project's logs/quest-calendars-bot.log
 	const timezone = `Mars/Test_${process.pid}_${Date.now()}`;
 
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
-	await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: timezone }, dir.path);
+	await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: timezone, QUESTS_DIR: 'quests' }, dir.path);
 
 	// A missing file reads as empty, so the assertion below reports it.
 	const log = await readFile(LOG_FILE, 'utf8').catch(() => '');
@@ -68,4 +77,19 @@ test("startup writes its log lines to the project's logs/quest-calendars-bot.log
 		log.includes(`GAME_TIMEZONE is not a valid timezone: ${timezone}`),
 		`this run's line is not in ${LOG_FILE}`,
 	);
+});
+
+test('startup fails, naming the file, when a Quest in any QUESTS_DIR directory is invalid', async () => {
+	await using cwd = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await using broken = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await mkdir(join(broken.path, 'nameless'));
+	await writeFile(join(broken.path, 'nameless', 'quest.ts'), 'export default {};\n');
+	// Relative entries resolve against the project folder, not where the bot is started from.
+	const dirs = ['test/fixtures/quests', relative(PROJECT, broken.path)].join(':');
+
+	const { code, output } = await start({ DISCORD_TOKEN: 'token', GAME_TIMEZONE: 'UTC', QUESTS_DIR: dirs }, cwd.path);
+
+	assert.equal(code, 1);
+	assert.match(output, /Quests can't be loaded/);
+	assert.match(output, /nameless\/quest\.ts: id must be lowercase letters, digits, and hyphens, not undefined/);
 });

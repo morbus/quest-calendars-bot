@@ -53,7 +53,7 @@ async function load(quests: QuestFiles[]): Promise<unknown> {
 			await writeFile(join(questDir, 'characters', `character-${c + 1}.ts`), source('character', character));
 		}
 	}
-	return await loadQuests(dir.path);
+	return await loadQuests([dir.path]);
 }
 
 /**
@@ -64,7 +64,7 @@ function source(helper: 'character' | 'quest', value: unknown): string {
 }
 
 test('Quests load, skipping files that are not Quest directories or Character files', async () => {
-	await assert.doesNotReject(loadQuests(fileURLToPath(new URL('fixtures/quests/', import.meta.url))));
+	await assert.doesNotReject(loadQuests([fileURLToPath(new URL('fixtures/quests/', import.meta.url))]));
 });
 
 test('a Quest that turns on an unknown Rule Module fails to load', async () => {
@@ -167,7 +167,7 @@ test('a Quest directory without a quest.ts fails to load, naming the file', asyn
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	await mkdir(join(dir.path, 'quest-1', 'characters'), { recursive: true });
 
-	await assert.rejects(loadQuests(dir.path), /quest-1\/quest\.ts: Cannot find module/);
+	await assert.rejects(loadQuests([dir.path]), /quest-1\/quest\.ts: Cannot find module/);
 });
 
 test('a Character whose id is not lowercase letters, digits, and hyphens fails to load', async () => {
@@ -319,14 +319,14 @@ test('a Quest directory without a characters directory fails to load', async () 
 	await mkdir(join(dir.path, 'quest-1'));
 	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', METADATA));
 
-	await assert.rejects(loadQuests(dir.path), /quest-1\/characters: has no Characters/);
+	await assert.rejects(loadQuests([dir.path]), /quest-1\/characters: has no Characters/);
 });
 
 test('hidden directories, such as .git, are not Quests', async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	await mkdir(join(dir.path, '.git'));
 
-	assert.deepEqual(await loadQuests(dir.path), []);
+	assert.deepEqual(await loadQuests([dir.path]), []);
 });
 
 test('names of 80 characters and ids of 64 load', async () => {
@@ -346,7 +346,7 @@ test('a characters that is a file, not a directory, fails to load', async () => 
 	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', METADATA));
 	await writeFile(join(dir.path, 'quest-1', 'characters'), '');
 
-	await assert.rejects(loadQuests(dir.path), /ENOTDIR/);
+	await assert.rejects(loadQuests([dir.path]), /ENOTDIR/);
 });
 
 test('two Quests with the same name fail to load', async () => {
@@ -364,7 +364,7 @@ test('a number that is not a number is named as such', async () => {
 	const pilgrim = source('character', CHARACTER).replace('"maxHealth":8', '"maxHealth":NaN');
 	await writeFile(join(dir.path, 'quest-1', 'characters', 'pilgrim.ts'), pilgrim);
 
-	await assert.rejects(loadQuests(dir.path), /stats\.maxHealth must be a whole number of at least 1, not NaN/);
+	await assert.rejects(loadQuests([dir.path]), /stats\.maxHealth must be a whole number of at least 1, not NaN/);
 });
 
 test('hidden files in characters/, such as editor lock files, are not Characters', async () => {
@@ -374,14 +374,36 @@ test('hidden files in characters/, such as editor lock files, are not Characters
 	await writeFile(join(dir.path, 'quest-1', 'characters', 'pilgrim.ts'), source('character', CHARACTER));
 	await writeFile(join(dir.path, 'quest-1', 'characters', '._pilgrim.ts'), 'not TypeScript');
 
-	await assert.doesNotReject(loadQuests(dir.path));
+	await assert.doesNotReject(loadQuests([dir.path]));
 });
 
 test('a Quest directory that is a symbolic link loads', async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	await symlink(fileURLToPath(new URL('fixtures/quests/pilgrimage', import.meta.url)), join(dir.path, 'pilgrimage'));
 
-	const quests = (await loadQuests(dir.path)).map((quest) => quest.name);
+	const quests = (await loadQuests([dir.path])).map((quest) => quest.name);
 
 	assert.deepEqual(quests, ['The Amber Road']);
+});
+
+test('Quests from every directory load, sorted together by name', async () => {
+	await using extra = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await symlink(fileURLToPath(new URL('fixtures/quests/pilgrimage', import.meta.url)), join(extra.path, 'pilgrimage'));
+	const clockwork = fileURLToPath(new URL('fixtures/quests/clockwork-tower', import.meta.url));
+	await using first = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await symlink(clockwork, join(first.path, 'clockwork-tower'));
+
+	const quests = (await loadQuests([first.path, extra.path])).map((quest) => quest.name);
+
+	assert.deepEqual(quests, ['The Amber Road', 'The Clockwork Tower']);
+});
+
+test('two Quests with the same id in different directories fail to load', async () => {
+	await using first = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await using second = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	const pilgrimage = fileURLToPath(new URL('fixtures/quests/pilgrimage', import.meta.url));
+	await symlink(pilgrimage, join(first.path, 'pilgrimage'));
+	await symlink(pilgrimage, join(second.path, 'pilgrimage'));
+
+	await assert.rejects(loadQuests([first.path, second.path]), /id amber-road is already used by/);
 });

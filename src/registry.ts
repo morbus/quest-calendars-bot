@@ -38,14 +38,31 @@ export type Quest = QuestMetadata & {
 };
 
 /**
- * Loads every Quest directory in `dir`, sorted by name.
+ * Loads every Quest directory in each of `dirs`, sorted by name.
  *
  * @throws When a Quest is invalid, naming the file at fault and the problem.
  */
-export async function loadQuests(dir: string): Promise<Quest[]> {
+export async function loadQuests(dirs: string[]): Promise<Quest[]> {
 	const quests: Quest[] = [];
 	const questIds = new Map<string, string>();
 	const questNames = new Map<string, string>();
+	for (const dir of dirs) {
+		quests.push(...(await loadQuestDirs(dir, questIds, questNames)));
+	}
+	return quests.sort(byName);
+}
+
+/**
+ * Loads every Quest directory in `dir`, claiming each Quest's id and name.
+ *
+ * @throws When a Quest is invalid, naming the file at fault and the problem.
+ */
+async function loadQuestDirs(
+	dir: string,
+	questIds: Map<string, string>,
+	questNames: Map<string, string>,
+): Promise<Quest[]> {
+	const quests: Quest[] = [];
 	for (const entry of await readdir(dir)) {
 		const questDir = join(dir, entry);
 		// stat() follows a symbolic link, so a linked Quest directory loads too.
@@ -72,7 +89,7 @@ export async function loadQuests(dir: string): Promise<Quest[]> {
 		if (characters.length === 0) throw new Error(`${join(questDir, 'characters')}: has no Characters`);
 		quests.push({ ...metadata, characters: characters.sort(byName) });
 	}
-	return quests.sort(byName);
+	return quests;
 }
 
 /**

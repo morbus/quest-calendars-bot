@@ -13,7 +13,7 @@ const NOW = new Date('2026-11-13T09:00:00Z');
 /**
  * The fixture Quests: The Clockwork Tower, with two Characters, and The Amber Road, with one.
  */
-const QUESTS = await loadQuests(fileURLToPath(new URL('fixtures/quests/', import.meta.url)));
+const QUESTS = await loadQuests([fileURLToPath(new URL('fixtures/quests/', import.meta.url))]);
 
 /**
  * A Game with in-memory storage and the given Quests.

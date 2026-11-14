@@ -7,6 +7,7 @@ import { createGame } from './game.ts';
 import { logger } from './log.ts';
 import { loadQuests } from './registry.ts';
 import { openStorage } from './storage.ts';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -15,9 +16,9 @@ import { fileURLToPath } from 'node:url';
 const DB_FILE = fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.meta.url));
 
 /**
- * The Quest directories, in the project wherever the bot is started from.
+ * The project folder, which relative QUESTS_DIR entries resolve against, wherever the bot is started from.
  */
-const QUESTS_DIR = fileURLToPath(new URL('../quests/', import.meta.url));
+const PROJECT_DIR = fileURLToPath(new URL('..', import.meta.url));
 
 /**
  * How long a failed startup waits for its last log lines to be written before it forces Node to exit.
@@ -33,11 +34,13 @@ const EXIT_GRACE_MS = 1000;
  * to exit shortly after, in case something such as the Discord client still holds Node open.
  */
 async function main(): Promise<void> {
-	const { DISCORD_TOKEN: token, GAME_TIMEZONE: timezone } = process.env;
+	const { DISCORD_TOKEN: token, GAME_TIMEZONE: timezone, QUESTS_DIR: questsDir } = process.env;
 	logger.info('Starting Quest Calendars Bot');
 
-	if (!token || !timezone) {
-		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE'].filter(Boolean);
+	if (!token || !timezone || !questsDir) {
+		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE', !questsDir && 'QUESTS_DIR'].filter(
+			Boolean,
+		);
 		logger.error(`Missing environment variables: ${missing.join(', ')}`);
 		process.exitCode = 1;
 		return;
@@ -59,11 +62,13 @@ async function main(): Promise<void> {
 	}
 	logger.info('Opened game state', { from: DB_FILE });
 
+	// Like PATH, QUESTS_DIR lists directories separated by colons.
+	const questDirs = questsDir.split(':').map((dir) => resolve(PROJECT_DIR, dir));
 	let quests;
 	try {
-		quests = await loadQuests(QUESTS_DIR);
+		quests = await loadQuests(questDirs);
 	} catch (error) {
-		logger.error(`Quests can't be loaded: ${QUESTS_DIR}`, error);
+		logger.error(`Quests can't be loaded from QUESTS_DIR: ${questDirs.join(':')}`, error);
 		process.exitCode = 1;
 		return;
 	}

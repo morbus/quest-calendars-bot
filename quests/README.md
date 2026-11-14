@@ -1,6 +1,6 @@
 # Quests
 
-Each Quest is a directory here, loaded when the bot starts (`docs/adr/0001-pages-are-declarative-typescript.md`).
+Each Quest is a directory here, or in another directory that QUESTS_DIR lists (see `.env.example`), loaded when the bot starts (`docs/adr/0001-pages-are-declarative-typescript.md`).
 The bot won't start while any Quest is invalid, and its error names the file at fault.
 
 ```
