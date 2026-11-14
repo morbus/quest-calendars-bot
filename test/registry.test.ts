@@ -35,10 +35,15 @@ const CHARACTER: Character = {
 };
 
 /**
+ * A Quest to write for {@link load}: its metadata and Characters, each valid unless a test says otherwise.
+ */
+type QuestFiles = { characters?: unknown[]; metadata?: unknown };
+
+/**
  * Writes each Quest as a directory, quest-1/ and on, with its `quest.ts` and a characters/character-1.ts and on,
  * then loads them all, as startup does.
  */
-async function load(quests: { characters?: unknown[]; metadata?: unknown }[]): Promise<unknown> {
+async function load(quests: QuestFiles[]): Promise<unknown> {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	for (const [q, { characters = [CHARACTER], metadata = METADATA }] of quests.entries()) {
 		const questDir = join(dir.path, `quest-${q + 1}`);
@@ -173,7 +178,7 @@ test('a Character whose id is not lowercase letters, digits, and hyphens fails t
 /**
  * Quests that fail to load, each with the error that names what is wrong.
  */
-const MALFORMED: { error: RegExp; name: string; quest: { characters?: unknown[]; metadata?: unknown } }[] = [
+const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'Quest metadata that is not an object',
 		quest: { metadata: null },
@@ -294,7 +299,7 @@ test('hidden directories, such as .git, are not Quests', async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	await mkdir(join(dir.path, '.git'));
 
-	await assert.deepEqual(await loadQuests(dir.path), []);
+	assert.deepEqual(await loadQuests(dir.path), []);
 });
 
 test('names of 80 characters and ids of 64 load', async () => {
