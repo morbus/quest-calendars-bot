@@ -242,7 +242,7 @@ function checkCharacter(value: unknown, file: string): Loaded<Character> {
 }
 
 /**
- * `declared`, with its image, if any, read from beside `file`.
+ * `declared`, with its image, if any, read from its path relative to `file`.
  *
  * @remarks
  * Reading it now means a reply still shows it if the file moves while the bot runs.
@@ -258,23 +258,23 @@ function withImage<T extends { image?: string }>(declared: T, file: string): Loa
 	const path = resolve(dirname(file), image);
 	const stats = statSync(path, { throwIfNoEntry: false });
 	if (!stats?.isFile()) fail('image', 'a file at that path, relative to this one', image);
-	const tooLarge = `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`;
+	const maxSize = `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`;
 	// Check the size before reading, so a huge file isn't read at all,
 	// and again after, in case the file was still being written.
-	if (stats.size > MAX_IMAGE_BYTES) fail('image', tooLarge, image);
+	if (stats.size > MAX_IMAGE_BYTES) fail('image', maxSize, image);
 	const data = readFileSync(path);
-	if (data.length > MAX_IMAGE_BYTES) fail('image', tooLarge, image);
+	if (data.length > MAX_IMAGE_BYTES) fail('image', maxSize, image);
 	return { ...rest, image: { data, name: basename(path) } };
 }
 
 /**
  * Accepts a Quest or Character id.
  *
- * @throws When it isn't lowercase letters and digits with single hyphens between them, or is too long.
+ * @throws When it isn't letters a–z and digits 0–9 with single hyphens between them, or is too long.
  */
 function checkId(id: unknown): void {
 	if (typeof id !== 'string' || !ID.test(id)) {
-		fail('id', 'lowercase letters and digits, with single hyphens between them', id);
+		fail('id', 'letters a–z and digits 0–9, with single hyphens between them', id);
 	}
 	if (id.length > MAX_ID_LENGTH) fail('id', `at most ${MAX_ID_LENGTH} characters`, id);
 }

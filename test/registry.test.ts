@@ -125,20 +125,27 @@ test('a Quest that turns on the meter Rule Module without naming the meter fails
 	);
 });
 
-test('a Quest whose id is not lowercase letters and digits with single hyphens fails to load', async () => {
+test('a Quest whose id is not letters a–z and digits 0–9 with single hyphens fails to load', async () => {
 	await assert.rejects(
 		load([{ metadata: { ...METADATA, id: 'Amber Road' } }]),
-		/quest-1\/quest\.ts: id must be lowercase letters and digits, with single hyphens between them, not "Amber Road"/,
+		/quest-1\/quest\.ts: id must be letters a–z and digits 0–9, with single hyphens between them, not "Amber Road"/,
 	);
 });
 
-test('a Quest whose id has a hyphen at its end or two in a row fails to load', async () => {
+test('a Quest whose id has a hyphen at its start or end, or two in a row, fails to load', async () => {
 	for (const id of ['amber-', '-amber', 'amber--road']) {
 		await assert.rejects(
 			load([{ metadata: { ...METADATA, id } }]),
-			new RegExp(`id must be lowercase letters and digits, with single hyphens between them, not "${id}"`),
+			new RegExp(`id must be letters a–z and digits 0–9, with single hyphens between them, not "${id}"`),
 		);
 	}
+});
+
+test('a Quest whose id has a letter outside a–z fails to load', async () => {
+	await assert.rejects(
+		load([{ metadata: { ...METADATA, id: 'café' } }]),
+		/id must be letters a–z and digits 0–9, with single hyphens between them, not "café"/,
+	);
 });
 
 test('a Character whose Trait is not a whole number fails to load', async () => {
@@ -181,10 +188,10 @@ test('a Quest directory without a quest.ts fails to load, naming the file', asyn
 	await assert.rejects(loadQuests([dir.path]), /quest-1\/quest\.ts: Cannot find module/);
 });
 
-test('a Character whose id is not lowercase letters and digits with single hyphens fails to load', async () => {
+test('a Character whose id is not letters a–z and digits 0–9 with single hyphens fails to load', async () => {
 	await assert.rejects(
 		load([{ characters: [{ ...CHARACTER, id: 'pilgrim one' }] }]),
-		/characters\/character-1\.ts: id must be lowercase letters and digits, with single hyphens between them, not "pilgrim one"/,
+		/characters\/character-1\.ts: id must be letters a–z and digits 0–9, with single hyphens between them, not "pilgrim one"/,
 	);
 });
 
@@ -200,7 +207,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'a Quest with no id',
 		quest: { metadata: { ...METADATA, id: undefined } },
-		error: /quest\.ts: id must be lowercase letters and digits, with single hyphens between them, not undefined/,
+		error: /quest\.ts: id must be letters a–z and digits 0–9, with single hyphens between them, not undefined/,
 	},
 	{
 		name: 'a Quest id over 64 characters',
@@ -250,7 +257,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'a Character id that is not text',
 		quest: { characters: [{ ...CHARACTER, id: 5 }] },
-		error: /character-1\.ts: id must be lowercase letters and digits, with single hyphens between them, not 5/,
+		error: /character-1\.ts: id must be letters a–z and digits 0–9, with single hyphens between them, not 5/,
 	},
 	{
 		name: 'a Character with no name',
