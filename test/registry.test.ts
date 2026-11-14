@@ -217,17 +217,17 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'a Quest with no name',
 		quest: { metadata: { ...METADATA, name: undefined } },
-		error: /quest\.ts: name must be text of 1 to 80 characters, not undefined/,
+		error: /quest\.ts: name must be text of 1 to 80 characters that isn't blank, not undefined/,
 	},
 	{
 		name: 'a Quest with an empty name',
 		quest: { metadata: { ...METADATA, name: '' } },
-		error: /quest\.ts: name must be text of 1 to 80 characters, not ""/,
+		error: /quest\.ts: name must be text of 1 to 80 characters that isn't blank, not ""/,
 	},
 	{
 		name: 'a Quest name over 80 characters',
 		quest: { metadata: { ...METADATA, name: 'A'.repeat(81) } },
-		error: /quest\.ts: name must be text of 1 to 80 characters, not "A{81}"/,
+		error: /quest\.ts: name must be text of 1 to 80 characters that isn't blank, not "A{81}"/,
 	},
 	{
 		name: 'a completion flag that is not true or false',
@@ -237,7 +237,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'a Quest with no Currency',
 		quest: { metadata: { ...METADATA, currency: undefined } },
-		error: /quest\.ts: currency must be text, not undefined/,
+		error: /quest\.ts: currency must be text that isn't blank, not undefined/,
 	},
 	{
 		name: 'Rule Modules that are not a list',
@@ -247,7 +247,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'an empty meter name',
 		quest: { metadata: { ...METADATA, meter: '', ruleModules: ['meter'] } },
-		error: /quest\.ts: meter must be text, not ""/,
+		error: /quest\.ts: meter must be text that isn't blank, not ""/,
 	},
 	{
 		name: 'a Character that is not an object',
@@ -262,7 +262,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'a Character with no name',
 		quest: { characters: [{ ...CHARACTER, name: undefined }] },
-		error: /character-1\.ts: name must be text of 1 to 80 characters, not undefined/,
+		error: /character-1\.ts: name must be text of 1 to 80 characters that isn't blank, not undefined/,
 	},
 	{
 		name: 'a Character with no Stats',
@@ -292,22 +292,22 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'an Ability with no name',
 		quest: { characters: [{ ...CHARACTER, abilities: [{ text: 'Add +1 to Wisdom rolls.' }] }] },
-		error: /character-1\.ts: abilities\[0\]\.name must be text, not undefined/,
+		error: /character-1\.ts: abilities\[0\]\.name must be text that isn't blank, not undefined/,
 	},
 	{
 		name: 'an Ability with no text',
 		quest: { characters: [{ ...CHARACTER, abilities: [{ name: 'Devout' }] }] },
-		error: /character-1\.ts: abilities\[0\]\.text must be text, not undefined/,
+		error: /character-1\.ts: abilities\[0\]\.text must be text that isn't blank, not undefined/,
 	},
 	{
 		name: 'a Quest with no description',
 		quest: { metadata: { ...METADATA, description: undefined } },
-		error: /quest\.ts: description must be text, not undefined/,
+		error: /quest\.ts: description must be text that isn't blank, not undefined/,
 	},
 	{
 		name: 'a Character with no description',
 		quest: { characters: [{ ...CHARACTER, description: ' ' }] },
-		error: /character-1\.ts: description must be text, not " "/,
+		error: /character-1\.ts: description must be text that isn't blank, not " "/,
 	},
 	{
 		name: 'a Quest image that is not an image file',
@@ -332,7 +332,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'a Quest name of only spaces',
 		quest: { metadata: { ...METADATA, name: '   ' } },
-		error: /quest\.ts: name must be text of 1 to 80 characters, not "   "/,
+		error: /quest\.ts: name must be text of 1 to 80 characters that isn't blank, not "   "/,
 	},
 	{
 		name: 'a Quest name across two lines',
@@ -342,7 +342,7 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	{
 		name: 'an Ability text of only spaces',
 		quest: { characters: [{ ...CHARACTER, abilities: [{ name: 'Devout', text: ' ' }] }] },
-		error: /character-1\.ts: abilities\[0\]\.text must be text, not " "/,
+		error: /character-1\.ts: abilities\[0\]\.text must be text that isn't blank, not " "/,
 	},
 	{
 		name: 'two Characters in one Quest with the same name',
