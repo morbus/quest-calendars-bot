@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Button, Component } from '../src/components.ts';
 import { createGame, type Game, type Reply } from '../src/game.ts';
 import { loadQuests, MAX_ID_LENGTH, type Image, type Quest } from '../src/registry.ts';
 import { openStorage } from '../src/storage.ts';
@@ -25,10 +26,42 @@ function image(path: string): Image {
 }
 
 /**
+ * Every part of `reply`, and every part inside them, in the order the Player sees them.
+ */
+function allParts(reply: Reply): Component[] {
+	const all: Component[] = [];
+	const visit = (parts: Component[]) => {
+		for (const part of parts) {
+			all.push(part);
+			if (part.type === 'container') visit(part.components);
+			if (part.type === 'section') visit(part.components);
+		}
+	};
+	visit(reply.components);
+	return all;
+}
+
+/**
+ * Every button in `reply` the Player can press to come back to the Game.
+ */
+function buttonsIn(reply: Reply): Button[] {
+	return allParts(reply)
+		.flatMap((part) => (part.type === 'actionRow' ? part.components : []))
+		.filter((button): button is Button => button.type === 'button');
+}
+
+/**
+ * Every text in `reply`, in order.
+ */
+function textsIn(reply: Reply): string[] {
+	return allParts(reply).flatMap((part) => (part.type === 'textDisplay' ? [part.content] : []));
+}
+
+/**
  * Each of `reply`'s buttons by label, and whether it can be pressed.
  */
-function buttonStates(reply: Reply): { disabled: boolean; label: string }[] | undefined {
-	return reply.buttons?.map(({ disabled, label }) => ({ disabled: disabled ?? false, label }));
+function buttonStates(reply: Reply): { disabled: boolean; label: string }[] {
+	return buttonsIn(reply).map(({ disabled, label }) => ({ disabled: disabled ?? false, label }));
 }
 
 /**
@@ -43,7 +76,7 @@ test('/quest start says Quests are coming soon when there are none', () => {
 
 	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
 
-	assert.deepEqual(reply.sections, [{ text: 'Quests are coming soon.' }]);
+	assert.deepEqual(reply, { components: [{ content: 'Quests are coming soon.', type: 'textDisplay' }] });
 });
 
 test('/quest start shows the first Quest on its own, with buttons to choose it or move through the rest', () => {
@@ -51,13 +84,18 @@ test('/quest start shows the first Quest on its own, with buttons to choose it o
 
 	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
 
-	assert.deepEqual(reply.sections, [{ text: 'Choose a Quest.' }]);
-	assert.deepEqual(reply.card, {
-		description: 'A pilgrimage along the old trade road.',
-		fields: [],
-		footer: 'Quest 1 of 2',
-		title: 'The Amber Road',
-	});
+	assert.deepEqual(reply.components.slice(0, 2), [
+		{ content: 'Choose a Quest.', type: 'textDisplay' },
+		{
+			components: [
+				{ content: '## The Amber Road\nA pilgrimage along the old trade road.', type: 'textDisplay' },
+				{ type: 'separator' },
+				{ content: '-# Quest 1 of 2', type: 'textDisplay' },
+			],
+			type: 'container',
+		},
+	]);
+	assert.equal(reply.components[2]?.type, 'actionRow');
 	assert.deepEqual(buttonStates(reply), [
 		{ disabled: false, label: 'Previous' },
 		{ disabled: false, label: 'Choose this Quest' },
@@ -69,7 +107,7 @@ test('/quest start shows the first Quest on its own, with buttons to choose it o
  * Presses the button labeled `label` in `reply`, and returns what the Player sees next.
  */
 function press(game: Game, reply: Reply, label: string): Reply {
-	const button = reply.buttons?.find((button) => button.label === label);
+	const button = buttonsIn(reply).find((button) => button.label === label);
 	assert.ok(button, `no button labeled ${label}`);
 	assert.ok(!button.disabled, `${label} is disabled`);
 	return game.handle('player-1', 'server-1', { button: button.id }, NOW).reply;
@@ -81,12 +119,14 @@ test('Next shows the next Quest, with its image, and Previous goes back', () => 
 
 	const second = press(game, first, 'Next');
 
-	assert.deepEqual(second.card, {
-		description: 'Climb a tower of gears before it strikes midnight.',
-		fields: [],
-		footer: 'Quest 2 of 2',
-		image: image('clockwork-tower/tower.png'),
-		title: 'The Clockwork Tower',
+	assert.deepEqual(second.components[1], {
+		components: [
+			{ items: [{ media: image('clockwork-tower/tower.png') }], type: 'mediaGallery' },
+			{ content: '## The Clockwork Tower\nClimb a tower of gears before it strikes midnight.', type: 'textDisplay' },
+			{ type: 'separator' },
+			{ content: '-# Quest 2 of 2', type: 'textDisplay' },
+		],
+		type: 'container',
 	});
 	assert.deepEqual(buttonStates(second), [
 		{ disabled: false, label: 'Previous' },
@@ -102,7 +142,7 @@ test('Previous on the first Quest wraps around to the last, and Next on the last
 
 	const last = press(game, first, 'Previous');
 
-	assert.equal(last.card?.title, 'The Clockwork Tower');
+	assert.ok(textsIn(last).includes('-# Quest 2 of 2'));
 	assert.deepEqual(press(game, last, 'Next'), first);
 });
 
@@ -111,7 +151,7 @@ test('Previous on the first Quest wraps around to the last, and Next on the last
  */
 function chooseQuest(game: Game, name: string): Reply {
 	let { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
-	while (reply.card?.title !== name) reply = press(game, reply, 'Next');
+	while (!textsIn(reply).some((text) => text.startsWith(`## ${name}\n`))) reply = press(game, reply, 'Next');
 	return press(game, reply, 'Choose this Quest');
 }
 
@@ -120,20 +160,23 @@ test('choosing a Quest shows its first Character on its own, with their Stats, T
 
 	const reply = chooseQuest(game, 'The Clockwork Tower');
 
-	assert.deepEqual(reply.sections, [{ text: 'Choose a Character for The Clockwork Tower.' }]);
-	assert.deepEqual(reply.card, {
-		description: 'A guard who has never left her post.',
-		fields: [
-			{ name: 'Stats', value: 'Max Health 14, Defense +4, Attack +3, Damage 2d4' },
-			{
-				name: 'Traits',
-				value: 'Strength +3, Dexterity +0, Constitution +2, Intellect -1, Wisdom +0, Charisma +1',
-			},
-			{ name: 'Abilities', value: '- Bulwark: Twice per Page: add +2 to a Defense roll.' },
-		],
-		footer: 'Character 1 of 2 in The Clockwork Tower',
-		title: 'Iron Warden',
-	});
+	assert.deepEqual(reply.components.slice(0, 2), [
+		{ content: 'Choose a Character for The Clockwork Tower.', type: 'textDisplay' },
+		{
+			components: [
+				{ content: '## Iron Warden\nA guard who has never left her post.', type: 'textDisplay' },
+				{ content: '**Stats**\nMax Health 14, Defense +4, Attack +3, Damage 2d4', type: 'textDisplay' },
+				{
+					content: '**Traits**\nStrength +3, Dexterity +0, Constitution +2, Intellect -1, Wisdom +0, Charisma +1',
+					type: 'textDisplay',
+				},
+				{ content: '**Abilities**\n- Bulwark: Twice per Page: add +2 to a Defense roll.', type: 'textDisplay' },
+				{ type: 'separator' },
+				{ content: '-# Character 1 of 2 in The Clockwork Tower', type: 'textDisplay' },
+			],
+			type: 'container',
+		},
+	]);
 	assert.deepEqual(buttonStates(reply), [
 		{ disabled: false, label: 'Previous' },
 		{ disabled: false, label: 'Choose this Character' },
@@ -147,22 +190,24 @@ test('Next shows the next Character, with their image, and Previous and Next wra
 
 	const second = press(game, first, 'Next');
 
-	assert.deepEqual(second.card, {
-		description: 'Builds what the tower breaks.',
-		fields: [
-			{ name: 'Stats', value: 'Max Health 10, Defense +2, Attack +1, Damage d6' },
+	assert.deepEqual(second.components[1], {
+		components: [
+			{ items: [{ media: image('clockwork-tower/characters/tinker.PNG') }], type: 'mediaGallery' },
+			{ content: '## Tinker\nBuilds what the tower breaks.', type: 'textDisplay' },
+			{ content: '**Stats**\nMax Health 10, Defense +2, Attack +1, Damage d6', type: 'textDisplay' },
 			{
-				name: 'Traits',
-				value: 'Strength -1, Dexterity +2, Constitution +0, Intellect +3, Wisdom +1, Charisma +0',
+				content: '**Traits**\nStrength -1, Dexterity +2, Constitution +0, Intellect +3, Wisdom +1, Charisma +0',
+				type: 'textDisplay',
 			},
 			{
-				name: 'Abilities',
-				value: '- Gadgeteer: Once per Rest: add d4 to an Intellect roll.\n- Spare Parts: Add +1 to rolls to repair.',
+				content:
+					'**Abilities**\n- Gadgeteer: Once per Rest: add d4 to an Intellect roll.\n- Spare Parts: Add +1 to rolls to repair.',
+				type: 'textDisplay',
 			},
+			{ type: 'separator' },
+			{ content: '-# Character 2 of 2 in The Clockwork Tower', type: 'textDisplay' },
 		],
-		footer: 'Character 2 of 2 in The Clockwork Tower',
-		image: image('clockwork-tower/characters/tinker.PNG'),
-		title: 'Tinker',
+		type: 'container',
 	});
 	assert.deepEqual(press(game, second, 'Previous'), first);
 	assert.deepEqual(press(game, second, 'Next'), first);
@@ -185,7 +230,7 @@ test('a Character with no Abilities says so', () => {
 
 	const reply = chooseQuest(game, 'The Amber Road');
 
-	assert.deepEqual(reply.card?.fields.at(-1), { name: 'Abilities', value: 'none' });
+	assert.ok(textsIn(reply).includes('**Abilities**\nnone'));
 });
 
 test('choosing a Character says starting a Quest is coming soon', () => {
@@ -193,7 +238,7 @@ test('choosing a Character says starting a Quest is coming soon', () => {
 
 	const reply = press(game, chooseQuest(game, 'The Amber Road'), 'Choose this Character');
 
-	assert.deepEqual(reply, { sections: [{ text: 'Starting a Quest is coming soon.' }] });
+	assert.deepEqual(reply, { components: [{ content: 'Starting a Quest is coming soon.', type: 'textDisplay' }] });
 });
 
 /**
@@ -210,13 +255,13 @@ function questsWithTowerCharacters(keep: (name: string) => boolean): Quest[] {
 test('an old Choose this Character button still chooses the same Character after the Characters change', () => {
 	const before = newGame();
 	const tinker = press(before, chooseQuest(before, 'The Clockwork Tower'), 'Next');
-	const choose = tinker.buttons?.find((button) => button.label === 'Choose this Character')?.id ?? '';
+	const choose = buttonsIn(tinker).find((button) => button.label === 'Choose this Character')?.id ?? '';
 
 	const after = newGame(questsWithTowerCharacters((name) => name === 'Tinker'));
 	const gone = newGame(questsWithTowerCharacters((name) => name !== 'Tinker'));
 
 	assert.deepEqual(after.handle('player-1', 'server-1', { button: choose }, NOW).reply, {
-		sections: [{ text: 'Starting a Quest is coming soon.' }],
+		components: [{ content: 'Starting a Quest is coming soon.', type: 'textDisplay' }],
 	});
 	assert.throws(() => gone.handle('player-1', 'server-1', { button: choose }, NOW), /Unknown button/);
 });
@@ -233,7 +278,7 @@ test("every button id fits in Discord's 100 characters when Quest and Character 
 	const quests = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW).reply;
 	const characters = press(game, quests, 'Choose this Quest');
 
-	const ids = [...(quests.buttons ?? []), ...(characters.buttons ?? [])].map((button) => button.id);
+	const ids = [...buttonsIn(quests), ...buttonsIn(characters)].map((button) => button.id);
 	assert.equal(ids.length, 6);
 	for (const id of ids) assert.ok(id.length <= 100, `${id} is ${id.length} characters`);
 });

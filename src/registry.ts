@@ -20,7 +20,7 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const MAX_ID_LENGTH = 44;
 
 /**
- * The longest Quest or Character name, short enough to show whole as an embed's title and in its footer.
+ * The longest Quest or Character name, short enough to show on one line as a heading and in the small text below it.
  */
 const MAX_NAME_LENGTH = 80;
 
@@ -291,7 +291,7 @@ function checkId(id: unknown): void {
 }
 
 /**
- * Accepts a Quest or Character name, which Players see as an embed's title and in its footer.
+ * Accepts a Quest or Character name, which Players see as a heading and in the small text below it.
  *
  * @throws When it isn't one line of text of at most {@link MAX_NAME_LENGTH} characters.
  */

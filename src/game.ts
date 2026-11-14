@@ -3,6 +3,7 @@
  */
 
 import { TRAITS, type Character } from './builder.ts';
+import type { Button, Component, TextDisplay } from './components.ts';
 import type { Image, Loaded, Quest } from './registry.ts';
 import type { Storage } from './storage.ts';
 
@@ -15,93 +16,13 @@ export type Input = { command: 'quest start' } | { button: string };
  * What an Input shows the Player who sent it.
  *
  * @remarks
- * The Discord adapter decides how it looks.
+ * The Game lays it out; the Discord adapter splits it into as many messages as it needs.
  */
 export type Reply = {
 	/**
-	 * The buttons to offer, in order.
-	 */
-	buttons?: Button[];
-	/**
-	 * One thing to show on its own, such as a Quest or a Character, after the sections.
-	 */
-	card?: Card;
-	/**
 	 * What to show, in order.
 	 */
-	sections: Section[];
-};
-
-/**
- * One Quest or Character, shown on its own with its image.
- */
-export type Card = {
-	/**
-	 * What it is about.
-	 */
-	description: string;
-	/**
-	 * Named details, in order, such as a Character's Stats, Traits, and Abilities.
-	 */
-	fields: Field[];
-	/**
-	 * Where it sits among the others, such as "Quest 1 of 2".
-	 */
-	footer: string;
-	/**
-	 * An image to show with it.
-	 */
-	image?: Image;
-	/**
-	 * Its name.
-	 */
-	title: string;
-};
-
-/**
- * One named detail of a {@link Card}.
- */
-export type Field = {
-	/**
-	 * What the detail is, such as "Stats".
-	 */
-	name: string;
-	/**
-	 * The detail itself.
-	 */
-	value: string;
-};
-
-/**
- * One paragraph of a {@link Reply}.
- */
-export type Section = {
-	/**
-	 * An image to show with it.
-	 */
-	image?: Image;
-	/**
-	 * What the paragraph says.
-	 */
-	text: string;
-};
-
-/**
- * A button the Player can press, which comes back as an Input with its `id`.
- */
-export type Button = {
-	/**
-	 * Whether it is shown but can't be pressed, such as Previous when there's only one Quest.
-	 */
-	disabled?: boolean;
-	/**
-	 * Identifies the press to the Game; the Discord adapter passes it back unread.
-	 */
-	id: string;
-	/**
-	 * What the button says.
-	 */
-	label: string;
+	components: Component[];
 };
 
 /**
@@ -173,7 +94,7 @@ function pressButton(quests: Quest[], button: string): Reply {
 	}
 	if (kind === 'character' && args.length === 2) {
 		if (!questWithId(args[0]).characters.some((character) => character.id === args[1])) throw unknown;
-		return { sections: [{ text: 'Starting a Quest is coming soon.' }] };
+		return { components: [text('Starting a Quest is coming soon.')] };
 	}
 	throw unknown;
 }
@@ -184,12 +105,17 @@ function pressButton(quests: Quest[], button: string): Reply {
  */
 function showQuest(quests: Quest[], index: number): Reply {
 	const quest = quests[index];
-	if (quest === undefined) return { sections: [{ text: 'Quests are coming soon.' }] };
+	if (quest === undefined) return { components: [text('Quests are coming soon.')] };
 	const [previous, next] = browseButtons('quests', index, quests.length);
 	return {
-		buttons: [previous, { id: questButtonId(quest), label: 'Choose this Quest' }, next],
-		card: card(quest, quest.description, [], `Quest ${index + 1} of ${quests.length}`),
-		sections: [{ text: 'Choose a Quest.' }],
+		components: [
+			text('Choose a Quest.'),
+			card(quest, quest.description, [], `Quest ${index + 1} of ${quests.length}`),
+			{
+				components: [previous, { id: questButtonId(quest), label: 'Choose this Quest', type: 'button' }, next],
+				type: 'actionRow',
+			},
+		],
 	};
 }
 
@@ -203,8 +129,8 @@ function showQuest(quests: Quest[], index: number): Reply {
 function browseButtons(list: string, index: number, count: number): [Button, Button] {
 	const disabled = count === 1;
 	return [
-		{ disabled, id: `prev:${list}:${(index - 1 + count) % count}`, label: 'Previous' },
-		{ disabled, id: `next:${list}:${(index + 1) % count}`, label: 'Next' },
+		{ disabled, id: `prev:${list}:${(index - 1 + count) % count}`, label: 'Previous', type: 'button' },
+		{ disabled, id: `next:${list}:${(index + 1) % count}`, label: 'Next', type: 'button' },
 	];
 }
 
@@ -223,47 +149,66 @@ function showCharacter(quest: Quest, index: number): Reply {
 	const character = quest.characters[index]!;
 	const count = quest.characters.length;
 	const [previous, next] = browseButtons(`characters:${quest.id}`, index, count);
+	const choose: Button = {
+		id: `character:${quest.id}:${character.id}`,
+		label: 'Choose this Character',
+		type: 'button',
+	};
 	return {
-		buttons: [previous, { id: `character:${quest.id}:${character.id}`, label: 'Choose this Character' }, next],
-		card: card(
-			character,
-			character.description,
-			characterFields(character),
-			`Character ${index + 1} of ${count} in ${quest.name}`,
-		),
-		sections: [{ text: `Choose a Character for ${quest.name}.` }],
+		components: [
+			text(`Choose a Character for ${quest.name}.`),
+			card(
+				character,
+				character.description,
+				characterDetails(character),
+				`Character ${index + 1} of ${count} in ${quest.name}`,
+			),
+			{ components: [previous, choose, next], type: 'actionRow' },
+		],
 	};
 }
 
 /**
- * A Character's Stats, Traits, and Abilities, a field each.
+ * A Character's Stats, Traits, and Abilities, a text each under a bold name.
  */
-function characterFields({ abilities, stats, traits }: Loaded<Character>): Field[] {
+function characterDetails({ abilities, stats, traits }: Loaded<Character>): TextDisplay[] {
+	const abilityLines = abilities.map((ability) => `- ${ability.name}: ${ability.text}`);
 	return [
-		{
-			name: 'Stats',
-			value: `Max Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`,
-		},
-		{ name: 'Traits', value: TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ') },
-		{
-			name: 'Abilities',
-			value:
-				abilities.length === 0 ? 'none' : abilities.map((ability) => `- ${ability.name}: ${ability.text}`).join('\n'),
-		},
+		text(
+			`**Stats**\nMax Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`,
+		),
+		text(`**Traits**\n${TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ')}`),
+		text(`**Abilities**\n${abilityLines.length === 0 ? 'none' : abilityLines.join('\n')}`),
 	];
 }
 
 /**
- * A card for a Quest or Character, with its image, if any.
+ * A Quest or Character on its own in a box: its image across the top, if it has one,
+ * then its name as a heading over `description`, then `details`, and `position` in small text below a line.
  */
 function card(
 	{ image, name }: { image?: Image; name: string },
 	description: string,
-	fields: Field[],
-	footer: string,
-): Card {
-	const shown = { description, fields, footer, title: name };
-	return image === undefined ? shown : { ...shown, image };
+	details: TextDisplay[],
+	position: string,
+): Component {
+	return {
+		components: [
+			...(image === undefined ? [] : [{ items: [{ media: image }], type: 'mediaGallery' as const }]),
+			text(`## ${name}\n${description}`),
+			...details,
+			{ type: 'separator' },
+			text(`-# ${position}`),
+		],
+		type: 'container',
+	};
+}
+
+/**
+ * A {@link TextDisplay} of `content`.
+ */
+function text(content: string): TextDisplay {
+	return { content, type: 'textDisplay' };
 }
 
 /**

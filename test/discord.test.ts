@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toDiscord, toMessages } from '../src/discord.ts';
-import type { Button, Card } from '../src/game.ts';
+import { MessageFlags } from 'discord.js';
+import type { ActionRow, Component, MediaGallery, TextDisplay } from '../src/components.ts';
+import { toDiscord, toMessages, type Message } from '../src/discord.ts';
 import type { Image } from '../src/registry.ts';
 
 /**
@@ -12,280 +13,301 @@ function image(name: string, bytes = 1): Image {
 }
 
 /**
- * `count` buttons, with ids b1 and on.
+ * A {@link TextDisplay} of `content`.
  */
-function buttons(count: number): Button[] {
-	return Array.from({ length: count }, (_, i) => ({ id: `b${i + 1}`, label: `Button ${i + 1}` }));
+function text(content: string): TextDisplay {
+	return { content, type: 'textDisplay' };
 }
 
-test('a short reply is one message, with a blank line between sections and buttons in rows of five', () => {
-	const messages = toMessages({ buttons: buttons(6), sections: [{ text: 'One.' }, { text: 'Two.' }] });
+/**
+ * A row of `count` buttons, with ids b1 and on.
+ */
+function row(count: number): ActionRow {
+	const components = Array.from({ length: count }, (_, i) => ({
+		id: `b${i + 1}`,
+		label: `Button ${i + 1}`,
+		type: 'button' as const,
+	}));
+	return { components, type: 'actionRow' };
+}
 
-	assert.deepEqual(messages, [
-		{
-			buttonRows: [buttons(6).slice(0, 5), buttons(6).slice(5)],
-			content: 'One.\n\nTwo.',
-			files: [],
-		},
-	]);
+/**
+ * A gallery of `images`.
+ */
+function gallery(...images: Image[]): MediaGallery {
+	return { items: images.map((media) => ({ media })), type: 'mediaGallery' };
+}
+
+/**
+ * The text of each top-level text in each message.
+ */
+function textsOf(messages: Message[]): string[][] {
+	return messages.map((message) => message.components.map((part) => (part.type === 'textDisplay' ? part.content : '')));
+}
+
+test('a reply that fits in one message is one message, with its parts as the Game laid them out', () => {
+	const components: Component[] = [
+		text('Choose a Quest.'),
+		{ components: [gallery(image('tower.png')), text('## Tower\nClimb.')], type: 'container' },
+		row(3),
+	];
+
+	assert.deepEqual(toMessages({ components }), [{ components }]);
 });
 
-test('sections that together go over 2000 characters start a new message, and buttons go on the last', () => {
-	const long = 'x'.repeat(1500);
+test('texts that together pass 4000 characters start a new message', () => {
+	const messages = toMessages({ components: [text('x'.repeat(1500)), text('y'.repeat(1500)), text('z'.repeat(1500))] });
 
-	const messages = toMessages({ buttons: buttons(1), sections: [{ text: long }, { text: long }, { text: 'End.' }] });
-
-	assert.deepEqual(messages, [
-		{ buttonRows: [], content: long, files: [] },
-		{ buttonRows: [buttons(1)], content: `${long}\n\nEnd.`, files: [] },
-	]);
+	assert.deepEqual(textsOf(messages), [['x'.repeat(1500), 'y'.repeat(1500)], ['z'.repeat(1500)]]);
 });
 
-test("a section's image is attached to the message that holds its text", () => {
-	const long = 'x'.repeat(1500);
+test('texts of exactly 4000 characters together stay in one message, and 4001 go in two', () => {
+	const exactly = toMessages({ components: [text('x'.repeat(2000)), text('y'.repeat(2000))] });
+	const over = toMessages({ components: [text('x'.repeat(2000)), text('y'.repeat(2001))] });
 
-	const messages = toMessages({
-		sections: [
-			{ text: 'Choose.' },
-			{ image: image('tower.png'), text: long },
-			{ image: image('road.png'), text: long },
-		],
-	});
-
-	assert.deepEqual(messages, [
-		{ buttonRows: [], content: `Choose.\n\n${long}`, files: [image('tower.png')] },
-		{ buttonRows: [], content: long, files: [image('road.png')] },
-	]);
+	assert.equal(exactly.length, 1);
+	assert.equal(over.length, 2);
 });
 
-test('a message holds at most 10 images', () => {
-	const sections = Array.from({ length: 11 }, (_, i) => ({ image: image(`${i + 1}.png`), text: `${i + 1}` }));
+test('a text over 4000 characters is split at its last line break that fits, or else at 4000', () => {
+	const lines = ['a'.repeat(2400), 'b'.repeat(2400), 'c'.repeat(5000)].join('\n');
 
-	const messages = toMessages({ sections });
+	const messages = toMessages({ components: [text(lines)] });
+
+	assert.deepEqual(textsOf(messages), [['a'.repeat(2400)], ['b'.repeat(2400)], ['c'.repeat(4000)], ['c'.repeat(1000)]]);
+});
+
+test('a text split at 4000 characters keeps each emoji whole', () => {
+	const messages = toMessages({ components: [text(`a${'🐉'.repeat(3000)}`)] });
+
+	assert.deepEqual(textsOf(messages), [[`a${'🐉'.repeat(1999)}`], ['🐉'.repeat(1001)]]);
+});
+
+test('a text split at 4000 characters keeps emoji made of several characters whole, such as flags', () => {
+	const messages = toMessages({ components: [text(`a${'🇫🇷'.repeat(1200)}`)] });
+
+	assert.deepEqual(textsOf(messages), [[`a${'🇫🇷'.repeat(999)}`], ['🇫🇷'.repeat(201)]]);
+});
+
+test('a single character longer than a message is cut at 4000', () => {
+	// One letter with 5000 accents is one character as a reader sees it.
+	const messages = toMessages({ components: [text(`e${'́'.repeat(5000)}`)] });
 
 	assert.deepEqual(
-		messages.map((message) => message.files.length),
+		textsOf(messages).map(([content]) => content?.length),
+		[4000, 1001],
+	);
+});
+
+test('a split that leaves only blank text sends no empty text', () => {
+	const messages = toMessages({ components: [text(`${'x'.repeat(4000)}\n\n`)] });
+
+	assert.deepEqual(textsOf(messages), [['x'.repeat(4000)]]);
+});
+
+test('parts of exactly 40 components, counting what each section holds, stay in one message, and 41 go in two', () => {
+	// Each section is three components: itself, its text, and its button.
+	const section: Component = { accessory: row(1).components[0]!, components: [text('x')], type: 'section' };
+	const sections = Array.from({ length: 13 }, () => section);
+	const separator: Component = { type: 'separator' };
+
+	const exactly = toMessages({ components: [...sections, separator] });
+	const over = toMessages({ components: [...sections, separator, separator] });
+
+	assert.equal(exactly.length, 1);
+	assert.deepEqual(
+		over.map((message) => message.components.length),
+		[14, 1],
+	);
+});
+
+test('parts that together attach more than 10 images, in galleries, thumbnails, or files, start a new message', () => {
+	const components: Component[] = [
+		...Array.from({ length: 9 }, (_, i) => gallery(image(`${i + 1}.png`))),
+		{
+			accessory: { media: image('face.png'), type: 'thumbnail' },
+			components: [text('Tinker')],
+			type: 'section',
+		},
+		{ file: image('notes.png'), type: 'file' },
+	];
+
+	const messages = toMessages({ components });
+
+	assert.deepEqual(
+		messages.map((message) => message.components.length),
 		[10, 1],
 	);
 });
 
-test('a section over 2000 characters is split at its last line break that fits, or else at 2000', () => {
-	const lines = ['a'.repeat(1200), 'b'.repeat(1200), 'c'.repeat(2500)].join('\n');
+test('the same image shown twice is attached once, so it counts once', () => {
+	const map = image('map.png');
+	const components = Array.from({ length: 11 }, () => gallery(map));
 
-	const messages = toMessages({ sections: [{ text: lines }] });
-
-	assert.deepEqual(
-		messages.map((message) => message.content),
-		['a'.repeat(1200), 'b'.repeat(1200), 'c'.repeat(2000), 'c'.repeat(500)],
-	);
+	assert.equal(toMessages({ components }).length, 1);
 });
 
-test('sections that join to exactly 2000 characters stay in one message', () => {
-	const messages = toMessages({ sections: [{ text: 'x'.repeat(999) }, { text: 'y'.repeat(999) }] });
-
-	assert.deepEqual(
-		messages.map((message) => message.content.length),
-		[2000],
-	);
-});
-
-test("a split section's image is attached once, to its first part", () => {
-	const messages = toMessages({ sections: [{ image: image('tower.png'), text: 'x'.repeat(2500) }] });
-
-	assert.deepEqual(
-		messages.map((message) => message.files),
-		[[image('tower.png')], []],
-	);
-});
-
-test('a section split at 2000 characters keeps each emoji whole', () => {
-	const messages = toMessages({ sections: [{ text: `a${'🐉'.repeat(1500)}` }] });
-
-	assert.deepEqual(
-		messages.map((message) => message.content),
-		[`a${'🐉'.repeat(999)}`, '🐉'.repeat(501)],
-	);
-});
-
-test('a section split at 2000 characters keeps emoji made of several characters whole, such as flags', () => {
-	const messages = toMessages({ sections: [{ text: `a${'🇫🇷'.repeat(600)}` }] });
-
-	assert.deepEqual(
-		messages.map((message) => message.content),
-		[`a${'🇫🇷'.repeat(499)}`, '🇫🇷'.repeat(101)],
-	);
-});
-
-test('a single character longer than a message is cut at 2000', () => {
-	// One letter with 2500 accents is one character as a reader sees it.
-	const messages = toMessages({ sections: [{ text: `e${'́'.repeat(2500)}` }] });
-
-	assert.deepEqual(
-		messages.map((message) => message.content.length),
-		[2000, 501],
-	);
-});
-
-test('a split that leaves only blank text sends no empty message', () => {
-	const messages = toMessages({ sections: [{ text: `${'x'.repeat(2000)}\n\n` }] });
-
-	assert.deepEqual(
-		messages.map((message) => message.content),
-		['x'.repeat(2000)],
-	);
-});
-
-test('images that together go over 8 MiB start a new message', () => {
+test('images that together pass 8 MiB start a new message', () => {
 	const fourMiB = 4 * 1024 * 1024;
-	const sections = [
-		{ image: image('a.png', fourMiB), text: 'A' },
-		{ image: image('b.png', fourMiB), text: 'B' },
-		{ image: image('c.png', 1), text: 'C' },
-	];
+	const components = [gallery(image('a.png', fourMiB)), gallery(image('b.png', fourMiB)), gallery(image('c.png'))];
 
-	const messages = toMessages({ sections });
+	const messages = toMessages({ components });
 
 	assert.deepEqual(
-		messages.map((message) => message.content),
-		['A\n\nB', 'C'],
+		messages.map((message) => message.components.length),
+		[2, 1],
 	);
 });
 
-test('sections that would join to 2001 characters, counting the blank line, go in two messages', () => {
-	const messages = toMessages({ sections: [{ text: 'x'.repeat(999) }, { text: 'y'.repeat(1000) }] });
+test('a box whose texts pass 4000 characters on their own has its longest text cut, with an ellipsis, to fit', () => {
+	const box: Component = {
+		components: [
+			text('## Tower'),
+			{ accessory: row(1).components[0]!, components: [text('d'.repeat(5000))], type: 'section' },
+		],
+		type: 'container',
+	};
 
-	assert.deepEqual(
-		messages.map((message) => message.content.length),
-		[999, 1000],
-	);
+	const [message, ...rest] = toMessages({ components: [box] });
+
+	assert.deepEqual(rest, []);
+	assert.deepEqual(message, {
+		components: [
+			{
+				components: [
+					text('## Tower'),
+					{ accessory: row(1).components[0], components: [text(`${'d'.repeat(3991)}…`)], type: 'section' },
+				],
+				type: 'container',
+			},
+		],
+	});
 });
 
-test("a message's images are sent as attachments with their bytes and names, its buttons as rows, and no embed", () => {
-	const tower = { data: Buffer.from('tower bytes'), name: 'tower.png' };
+test('a cut text is cut between graphemes, so an emoji at the limit is left out whole', () => {
+	const box: Component = { components: [text(`${'x'.repeat(3997)}🇯🇵yy`)], type: 'container' };
 
-	const { components, content, embeds, files } = toDiscord({
-		buttonRows: [buttons(2)],
-		content: 'Choose.',
-		files: [tower],
+	const [message] = toMessages({ components: [box] });
+
+	assert.deepEqual(message?.components, [{ components: [text(`${'x'.repeat(3997)}…`)], type: 'container' }]);
+});
+
+/**
+ * What Discord receives for `value`, as discord.js serializes it.
+ */
+function serialized(value: unknown) {
+	return JSON.parse(JSON.stringify(value));
+}
+
+test('every part is sent as its Discord counterpart, with the options it sets, as Components V2', () => {
+	const map = image('map.png');
+	const portrait = image('portrait.png');
+	const notes = image('notes.png');
+
+	const message = toDiscord({
+		components: [
+			text('Choose.'),
+			{
+				accentColor: 0xd4a017,
+				components: [
+					{ items: [{ description: 'A map', media: map, spoiler: true }, { media: portrait }], type: 'mediaGallery' },
+					{
+						accessory: { description: 'A face', media: portrait, spoiler: true, type: 'thumbnail' },
+						components: [text('## Tinker'), text('Builds.')],
+						type: 'section',
+					},
+					{
+						accessory: { label: 'Rules', type: 'linkButton', url: 'https://example.com/rules' },
+						components: [text('Read.')],
+						type: 'section',
+					},
+					{ divider: false, spacing: 'large', type: 'separator' },
+					{ type: 'separator' },
+					{ file: notes, spoiler: true, type: 'file' },
+					{ file: notes, type: 'file' },
+				],
+				spoiler: true,
+				type: 'container',
+			},
+			{
+				components: [
+					{ id: 'go', label: 'Go', type: 'button' },
+					{ disabled: true, emoji: '🎲', id: 'roll', label: 'Roll', style: 'success', type: 'button' },
+					{ id: 'quit', label: 'Quit', style: 'danger', type: 'button' },
+					{ id: 'back', label: 'Back', style: 'secondary', type: 'button' },
+					{ disabled: true, emoji: '📖', label: 'Rules', type: 'linkButton', url: 'https://example.com/rules' },
+				],
+				type: 'actionRow',
+			},
+		],
 	});
 
-	assert.equal(content, 'Choose.');
-	// An empty list, not none, so a reply that replaces a card clears it.
-	assert.deepEqual(embeds, []);
-	assert.deepEqual(files, [{ attachment: Buffer.from('tower bytes'), name: 'tower.png' }]);
-	// What Discord receives, as discord.js serializes it.
-	assert.deepEqual(JSON.parse(JSON.stringify(components)), [
+	assert.deepEqual(Object.keys(message).sort(), ['components', 'files', 'flags']);
+	assert.equal(message.flags, MessageFlags.IsComponentsV2);
+	assert.deepEqual(message.files, [
+		{ attachment: map.data, name: 'map.png' },
+		{ attachment: portrait.data, name: 'portrait.png' },
+		{ attachment: notes.data, name: 'notes.png' },
+	]);
+	assert.deepEqual(serialized(message.components), [
+		{ content: 'Choose.', type: 10 },
+		{
+			accent_color: 0xd4a017,
+			components: [
+				{
+					items: [
+						{ description: 'A map', media: { url: 'attachment://map.png' }, spoiler: true },
+						{ media: { url: 'attachment://portrait.png' } },
+					],
+					type: 12,
+				},
+				{
+					accessory: { description: 'A face', media: { url: 'attachment://portrait.png' }, spoiler: true, type: 11 },
+					components: [
+						{ content: '## Tinker', type: 10 },
+						{ content: 'Builds.', type: 10 },
+					],
+					type: 9,
+				},
+				{
+					accessory: { label: 'Rules', style: 5, type: 2, url: 'https://example.com/rules' },
+					components: [{ content: 'Read.', type: 10 }],
+					type: 9,
+				},
+				{ divider: false, spacing: 2, type: 14 },
+				{ type: 14 },
+				{ file: { url: 'attachment://notes.png' }, spoiler: true, type: 13 },
+				{ file: { url: 'attachment://notes.png' }, type: 13 },
+			],
+			spoiler: true,
+			type: 17,
+		},
 		{
 			components: [
-				{ custom_id: 'b1', disabled: false, label: 'Button 1', style: 1, type: 2 },
-				{ custom_id: 'b2', disabled: false, label: 'Button 2', style: 1, type: 2 },
+				{ custom_id: 'go', label: 'Go', style: 1, type: 2 },
+				{ custom_id: 'roll', disabled: true, emoji: { name: '🎲' }, label: 'Roll', style: 3, type: 2 },
+				{ custom_id: 'quit', label: 'Quit', style: 4, type: 2 },
+				{ custom_id: 'back', label: 'Back', style: 2, type: 2 },
+				{ disabled: true, emoji: { name: '📖' }, label: 'Rules', style: 5, type: 2, url: 'https://example.com/rules' },
 			],
 			type: 1,
 		},
 	]);
 });
 
-test("a reply's card goes on its last message, with the buttons, and its image is attached there", () => {
-	const card = { description: 'Climb.', fields: [], footer: 'Quest 2 of 2', image: image('tower.png'), title: 'Tower' };
+test('images are attached under names Discord can link to, and two different images with one name get different names', () => {
+	const tower = image('carte du ✨ monde.png');
+	const first = { data: Buffer.from('first'), name: 'map.png' };
+	const second = { data: Buffer.from('second'), name: 'map.png' };
 
-	const messages = toMessages({ buttons: buttons(3), card, sections: [{ text: 'Choose a Quest.' }] });
-
-	assert.deepEqual(messages, [
-		{ buttonRows: [buttons(3)], card, content: 'Choose a Quest.', files: [image('tower.png')] },
-	]);
-});
-
-test('a reply with a card and no text is still one message', () => {
-	const card = { description: 'Climb.', fields: [], footer: 'Quest 1 of 1', title: 'Tower' };
-
-	const messages = toMessages({ buttons: buttons(1), card, sections: [] });
-
-	assert.deepEqual(messages, [{ buttonRows: [buttons(1)], card, content: '', files: [] }]);
-});
-
-test("a card is sent as an embed showing its attached image, and a disabled button can't be pressed", () => {
-	const map = { data: Buffer.from('map bytes'), name: 'carte du ✨ monde.png' };
-	const card = {
-		description: 'Climb.',
-		fields: [{ name: 'Stats', value: 'Max Health 10' }],
-		footer: 'Quest 1 of 2',
-		image: map,
-		title: 'Tower',
-	};
-
-	const { components, embeds, files } = toDiscord({
-		buttonRows: [[{ disabled: true, id: 'prev', label: 'Previous' }]],
-		card,
-		content: '',
-		files: [map],
-	});
-
-	assert.deepEqual(JSON.parse(JSON.stringify(embeds)), [
-		{
-			description: 'Climb.',
-			fields: [{ name: 'Stats', value: 'Max Health 10' }],
-			footer: { text: 'Quest 1 of 2' },
-			image: { url: 'attachment://carte_du___monde.png' },
-			title: 'Tower',
-		},
-	]);
-	assert.deepEqual(files, [{ attachment: Buffer.from('map bytes'), name: 'carte_du___monde.png' }]);
-	assert.equal(JSON.parse(JSON.stringify(components))[0].components[0].disabled, true);
-});
-
-/**
- * The embed `toDiscord` builds for a message showing `card`, as Discord receives it.
- */
-function embedFor(card: Card) {
-	const { embeds } = toDiscord({ buttonRows: [], card, content: '', files: [] });
-	return JSON.parse(JSON.stringify(embeds))[0];
-}
-
-test("a card's description and fields are cut short, with an ellipsis, to fit an embed", () => {
-	const embed = embedFor({
-		description: 'd'.repeat(5000),
-		fields: [{ name: 'Abilities', value: 'a'.repeat(2000) }],
-		footer: 'Quest 1 of 1',
-		title: 'Tower',
-	});
-
-	assert.equal(embed.description, `${'d'.repeat(4095)}…`);
-	assert.equal(embed.fields[0].value, `${'a'.repeat(1023)}…`);
-});
-
-test('a card whose parts each fit but together pass 6000 characters has its description cut to fit', () => {
-	const fields = ['Stats', 'Traits', 'Abilities'].map((name) => ({ name, value: 'v'.repeat(1000) }));
-
-	const embed = embedFor({ description: 'd'.repeat(4000), fields, footer: 'Quest 1 of 1', title: 'Tower' });
-
-	const length = [embed.title, embed.description, embed.footer.text, ...fields.flatMap((f) => [f.name, f.value])].join(
-		'',
-	).length;
-	assert.equal(length, 6000);
-	assert.ok(embed.description.endsWith('…'));
-});
-
-test("a card whose image doesn't fit with the last message's images starts a new message", () => {
-	const sections = Array.from({ length: 10 }, (_, i) => ({ image: image(`${i + 1}.png`), text: `${i + 1}` }));
-	const card = { description: 'Climb.', fields: [], footer: 'Quest 1 of 1', image: image('tower.png'), title: 'Tower' };
-
-	const messages = toMessages({ buttons: buttons(1), card, sections });
+	const message = toDiscord({ components: [gallery(tower, first, second)] });
 
 	assert.deepEqual(
-		messages.map((message) => ({
-			buttons: message.buttonRows.length,
-			card: message.card?.title,
-			files: message.files.length,
-		})),
-		[
-			{ buttons: 0, card: undefined, files: 10 },
-			{ buttons: 1, card: 'Tower', files: 1 },
-		],
+		message.files.map(({ name }) => name),
+		['carte_du___monde.png', 'map.png', '2-map.png'],
 	);
-});
-
-test("a card's description is cut between graphemes, so an emoji at the limit is left out whole", () => {
-	const embed = embedFor({ description: `${'x'.repeat(4094)}🇯🇵`, fields: [], footer: 'Quest 1 of 1', title: 'Tower' });
-
-	assert.equal(embed.description, `${'x'.repeat(4094)}…`);
+	assert.deepEqual(
+		serialized(message.components)[0].items.map(({ media }: { media: { url: string } }) => media.url),
+		['attachment://carte_du___monde.png', 'attachment://map.png', 'attachment://2-map.png'],
+	);
 });

@@ -3,32 +3,31 @@
  */
 
 import {
-	ActionRowBuilder,
 	ApplicationIntegrationType,
-	ButtonBuilder,
 	ButtonStyle,
 	Client,
-	EmbedBuilder,
+	ComponentType,
 	Events,
 	InteractionContextType,
 	MessageFlags,
+	SeparatorSpacingSize,
 	SlashCommandBuilder,
+	type APIButtonComponent,
+	type APIComponentInContainer,
+	type APIMessageTopLevelComponent,
+	type APIUnfurledMediaItem,
 	type ButtonInteraction,
 	type ChatInputCommandInteraction,
 } from 'discord.js';
-import type { Button, Card, Game, Input, Reply } from './game.ts';
+import type { Button, Component, LinkButton, Media, TextDisplay, Thumbnail } from './components.ts';
+import type { Game, Input, Reply } from './game.ts';
 import { MAX_IMAGE_BYTES, type Image } from './registry.ts';
 import { logger } from './log.ts';
 
 /**
- * The most buttons Discord shows in one row.
+ * The most components Discord shows in one message, counting every part inside another and every button.
  */
-const BUTTONS_PER_ROW = 5;
-
-/**
- * The most characters of text Discord shows in one message.
- */
-const MAX_CONTENT_LENGTH = 2000;
+const MAX_COMPONENTS = 40;
 
 /**
  * The most files Discord attaches to one message.
@@ -36,14 +35,9 @@ const MAX_CONTENT_LENGTH = 2000;
 const MAX_FILES = 10;
 
 /**
- * What goes between two sections in one message: a blank line.
+ * The most characters Discord shows in one message's texts, all together.
  */
-const SECTION_BREAK = '\n\n';
-
-/**
- * The most characters Discord shows in each part of an embed the bot cuts, and in the whole embed.
- */
-const EMBED_LIMITS = { description: 4096, fieldValue: 1024, total: 6000 };
+const MAX_TEXT_LENGTH = 4000;
 
 /**
  * Splits text into graphemes, the characters a reader sees, keeping emoji such as flags whole.
@@ -51,25 +45,24 @@ const EMBED_LIMITS = { description: 4096, fieldValue: 1024, total: 6000 };
 const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
 
 /**
- * One Discord message of a {@link Reply}, before discord.js builds it.
+ * Discord's color for each {@link Button} style.
+ */
+const BUTTON_STYLES = {
+	danger: ButtonStyle.Danger,
+	primary: ButtonStyle.Primary,
+	secondary: ButtonStyle.Secondary,
+	success: ButtonStyle.Success,
+} as const;
+
+/**
+ * One Discord message of a {@link Reply}: at most {@link MAX_COMPONENTS} components holding at most
+ * {@link MAX_TEXT_LENGTH} characters of text and {@link MAX_FILES} images of {@link MAX_IMAGE_BYTES} together.
  */
 export type Message = {
 	/**
-	 * The buttons below the text, in rows.
+	 * What to show, in order.
 	 */
-	buttonRows: Button[][];
-	/**
-	 * A Quest or Character to show below the text, as an embed.
-	 */
-	card?: Card;
-	/**
-	 * The text, at most {@link MAX_CONTENT_LENGTH} characters.
-	 */
-	content: string;
-	/**
-	 * The images to attach: at most {@link MAX_FILES}, of at most {@link MAX_IMAGE_BYTES} together.
-	 */
-	files: Image[];
+	components: Component[];
 };
 
 /**
@@ -177,89 +170,135 @@ function toInput(command: string): Input {
 }
 
 /**
- * Splits a {@link Reply} into as few Discord messages as fit its text and images, with its card and buttons on the last.
+ * Splits a {@link Reply} into as few Discord messages as hold its parts, in order.
  *
  * @remarks
- * Sections are joined by a blank line. A section that won't fit in one message is split at a line break,
- * or else between graphemes.
+ * A text too long for one message is split at a line break, or else between graphemes, into texts
+ * of their own. Any other part whose texts are too long for one message has its longest text cut short.
  */
 export function toMessages(reply: Reply): Message[] {
 	const messages: Message[] = [];
-	for (const section of reply.sections) {
-		for (const [i, text] of splitText(section.text).entries()) {
-			const files = i === 0 && section.image !== undefined ? [section.image] : [];
-			const last = messages.at(-1);
-			if (last !== undefined && fitsIn(last, text, files)) {
-				last.content += `${SECTION_BREAK}${text}`;
-				last.files.push(...files);
-			} else {
-				messages.push({ buttonRows: [], content: text, files });
-			}
-		}
-	}
-	if (reply.card !== undefined) {
-		const files = reply.card.image === undefined ? [] : [reply.card.image];
+	for (const part of reply.components.flatMap(fitAlone)) {
 		const last = messages.at(-1);
-		if (last !== undefined && hasRoomForFiles(last, files)) {
-			last.card = reply.card;
-			last.files.push(...files);
-		} else {
-			messages.push({ buttonRows: [], card: reply.card, content: '', files });
-		}
-	}
-	const buttons = reply.buttons ?? [];
-	for (let i = 0; i < buttons.length; i += BUTTONS_PER_ROW) {
-		messages.at(-1)?.buttonRows.push(buttons.slice(i, i + BUTTONS_PER_ROW));
+		if (last !== undefined && fits([...last.components, part])) last.components.push(part);
+		else messages.push({ components: [part] });
 	}
 	return messages;
 }
 
 /**
- * Whether `message` has room for `text`, after a {@link SECTION_BREAK}, and `files`.
+ * `part` as parts that each fit in a message on their own.
  */
-function fitsIn(message: Message, text: string, files: Image[]): boolean {
+function fitAlone(part: Component): Component[] {
+	if (part.type === 'textDisplay') return splitText(part.content).map((content) => ({ content, type: 'textDisplay' }));
+	let fitted = part;
+	while (textLength([fitted]) > MAX_TEXT_LENGTH) {
+		const longest = textsIn([fitted]).reduce((a, b) => (b.content.length > a.content.length ? b : a));
+		const max = longest.content.length - (textLength([fitted]) - MAX_TEXT_LENGTH);
+		fitted = withText(fitted, longest, clip(longest.content, max));
+	}
+	return [fitted];
+}
+
+/**
+ * Whether `parts` fit in one message.
+ */
+function fits(parts: Component[]): boolean {
+	const images = imagesIn(parts);
+	const bytes = images.reduce((total, image) => total + image.data.length, 0);
 	return (
-		message.content.length + SECTION_BREAK.length + text.length <= MAX_CONTENT_LENGTH && hasRoomForFiles(message, files)
+		textLength(parts) <= MAX_TEXT_LENGTH &&
+		count(parts) <= MAX_COMPONENTS &&
+		images.length <= MAX_FILES &&
+		bytes <= MAX_IMAGE_BYTES
 	);
 }
 
 /**
- * Whether `message` can attach `files` as well as its own.
+ * Every part in `parts` and every part inside them, as Discord counts them, with each button and thumbnail.
  */
-function hasRoomForFiles(message: Message, files: Image[]): boolean {
-	const all = [...message.files, ...files];
-	return all.length <= MAX_FILES && bytes(all) <= MAX_IMAGE_BYTES;
+function partsIn(parts: Part[]): Part[] {
+	return parts.flatMap((part) => {
+		if (part.type === 'container' || part.type === 'actionRow') return [part, ...partsIn(part.components)];
+		if (part.type === 'section') return [part, ...partsIn(part.components), part.accessory];
+		return [part];
+	});
 }
 
 /**
- * How many bytes `images` hold together.
+ * Anything Discord counts as a component.
  */
-function bytes(images: Image[]): number {
-	return images.reduce((total, image) => total + image.data.length, 0);
+type Part = Component | Button | LinkButton | Thumbnail;
+
+/**
+ * How many components Discord counts in `parts`.
+ */
+function count(parts: Component[]): number {
+	return partsIn(parts).length;
 }
 
 /**
- * Splits `text` into pieces of at most {@link MAX_CONTENT_LENGTH} characters, at the last line break that fits,
+ * Every text in `parts`, in order.
+ */
+function textsIn(parts: Component[]): TextDisplay[] {
+	return partsIn(parts).filter((part) => part.type === 'textDisplay');
+}
+
+/**
+ * How many characters of text `parts` hold together.
+ */
+function textLength(parts: Component[]): number {
+	return textsIn(parts).reduce((total, { content }) => total + content.length, 0);
+}
+
+/**
+ * Every image `parts` show, each once.
+ */
+function imagesIn(parts: Component[]): Image[] {
+	const images = partsIn(parts).flatMap((part) => {
+		if (part.type === 'file') return [part.file];
+		if (part.type === 'mediaGallery') return part.items.map(({ media }) => media);
+		if (part.type === 'thumbnail') return [part.media];
+		return [];
+	});
+	return [...new Set(images)];
+}
+
+/**
+ * `part`, with `old` in it replaced by a text of `content`.
+ */
+function withText<T extends Component>(part: T, old: TextDisplay, content: string): T {
+	const replace = (inner: Component): Component => {
+		if (inner === old) return { content, type: 'textDisplay' };
+		if (inner.type === 'container') return { ...inner, components: inner.components.map(replace) } as Component;
+		if (inner.type === 'section') return { ...inner, components: inner.components.map(replace) } as Component;
+		return inner;
+	};
+	return replace(part) as T;
+}
+
+/**
+ * Splits `text` into pieces of at most {@link MAX_TEXT_LENGTH} characters, at the last line break that fits,
  * or else at the last grapheme that fits, so an emoji such as a flag is never cut in two.
  */
 function splitText(text: string): string[] {
 	const pieces: string[] = [];
 	let rest = text;
-	while (rest.length > MAX_CONTENT_LENGTH) {
-		const lineBreak = rest.lastIndexOf('\n', MAX_CONTENT_LENGTH);
+	while (rest.length > MAX_TEXT_LENGTH) {
+		const lineBreak = rest.lastIndexOf('\n', MAX_TEXT_LENGTH);
 		const end = lineBreak > 0 ? lineBreak : lastGraphemeBreak(rest);
 		pieces.push(rest.slice(0, end));
 		rest = rest.slice(lineBreak > 0 ? end + 1 : end);
 	}
 	pieces.push(rest);
-	// Discord refuses a message of only whitespace, such as what a trailing line break leaves.
+	// Discord refuses a text of only whitespace, such as what a trailing line break leaves.
 	return pieces.filter((piece) => piece.trim() !== '');
 }
 
 /**
  * Where the last grapheme that fits in `max` characters of `text` ends.
  */
-function lastGraphemeBreak(text: string, max = MAX_CONTENT_LENGTH): number {
+function lastGraphemeBreak(text: string, max = MAX_TEXT_LENGTH): number {
 	let end = 0;
 	for (const { index } of GRAPHEMES.segment(text)) {
 		if (index > max) break;
@@ -270,48 +309,6 @@ function lastGraphemeBreak(text: string, max = MAX_CONTENT_LENGTH): number {
 }
 
 /**
- * Builds a {@link Message} with discord.js.
- */
-export function toDiscord({ buttonRows, card, content, files }: Message) {
-	const components = buttonRows.map((row) =>
-		new ActionRowBuilder<ButtonBuilder>().addComponents(
-			row.map((button) =>
-				new ButtonBuilder()
-					.setCustomId(button.id)
-					.setDisabled(button.disabled ?? false)
-					.setLabel(button.label)
-					.setStyle(ButtonStyle.Primary),
-			),
-		),
-	);
-	return {
-		components,
-		content,
-		embeds: card === undefined ? [] : [toEmbed(card)],
-		files: files.map(({ data, name }) => ({ attachment: data, name: attachmentName(name) })),
-	};
-}
-
-/**
- * Builds a {@link Card} as a Discord embed, showing its image from the message's attachments.
- *
- * @remarks
- * Text too long for an embed is cut short with an ellipsis. When the parts together are too long,
- * the description gives way, since the name, Stats, Traits, and Abilities matter more.
- */
-function toEmbed({ description, fields, footer, image, title }: Card): EmbedBuilder {
-	// The title, footer, and field names are short by construction, so only the authored text needs cutting.
-	const clipped = fields.map(({ name, value }) => ({ name, value: clip(value, EMBED_LIMITS.fieldValue) }));
-	const used = [title, footer, ...clipped.flatMap(({ name, value }) => [name, value])].join('').length;
-	const embed = new EmbedBuilder()
-		.setTitle(title)
-		.setDescription(clip(description, Math.min(EMBED_LIMITS.description, EMBED_LIMITS.total - used)))
-		.addFields(clipped)
-		.setFooter({ text: footer });
-	return image === undefined ? embed : embed.setImage(`attachment://${attachmentName(image.name)}`);
-}
-
-/**
  * `text`, cut to at most `max` characters between graphemes, ending in an ellipsis when it was cut.
  */
 function clip(text: string, max: number): string {
@@ -319,9 +316,93 @@ function clip(text: string, max: number): string {
 }
 
 /**
- * An image's name as Discord can link to it from an embed, with anything but letters, digits, `.`, `-`,
- * and `_` replaced by `_`.
+ * Builds a {@link Message} as Discord's Components V2, attaching each image it shows once.
  */
-function attachmentName(name: string): string {
-	return name.replace(/[^\w.-]/gu, '_');
+export function toDiscord({ components }: Message) {
+	const names = attachmentNames(imagesIn(components));
+	const url = (image: Image): APIUnfurledMediaItem => ({ url: `attachment://${names.get(image)}` });
+	const media = ({ description, media, spoiler }: Media) => ({
+		media: url(media),
+		...(description === undefined ? {} : { description }),
+		...(spoiler === undefined ? {} : { spoiler }),
+	});
+	const button = (button: Button | LinkButton): APIButtonComponent => {
+		const shared = {
+			...(button.disabled === undefined ? {} : { disabled: button.disabled }),
+			...(button.emoji === undefined ? {} : { emoji: { name: button.emoji } }),
+			label: button.label,
+			type: ComponentType.Button as const,
+		};
+		return button.type === 'linkButton'
+			? { ...shared, style: ButtonStyle.Link, url: button.url }
+			: { ...shared, custom_id: button.id, style: BUTTON_STYLES[button.style ?? 'primary'] };
+	};
+	const text = ({ content }: TextDisplay) => ({ content, type: ComponentType.TextDisplay as const });
+	const part = (part: Exclude<Component, { type: 'container' }>): APIComponentInContainer => {
+		switch (part.type) {
+			case 'actionRow':
+				return { components: part.components.map(button), type: ComponentType.ActionRow };
+			case 'file':
+				return {
+					file: url(part.file),
+					...(part.spoiler === undefined ? {} : { spoiler: part.spoiler }),
+					type: ComponentType.File,
+				};
+			case 'mediaGallery':
+				return { items: part.items.map(media), type: ComponentType.MediaGallery };
+			case 'section':
+				return {
+					accessory:
+						part.accessory.type === 'thumbnail'
+							? { ...media(part.accessory), type: ComponentType.Thumbnail }
+							: button(part.accessory),
+					components: part.components.map(text),
+					type: ComponentType.Section,
+				};
+			case 'separator':
+				return {
+					...(part.divider === undefined ? {} : { divider: part.divider }),
+					...(part.spacing === undefined ? {} : { spacing: SEPARATOR_SPACINGS[part.spacing] }),
+					type: ComponentType.Separator,
+				};
+			case 'textDisplay':
+				return text(part);
+		}
+	};
+	const topLevel = (component: Component): APIMessageTopLevelComponent =>
+		component.type === 'container'
+			? {
+					...(component.accentColor === undefined ? {} : { accent_color: component.accentColor }),
+					components: component.components.map(part),
+					...(component.spoiler === undefined ? {} : { spoiler: component.spoiler }),
+					type: ComponentType.Container,
+				}
+			: part(component);
+	return {
+		components: components.map(topLevel),
+		files: [...names].map(([{ data }, name]) => ({ attachment: data, name })),
+		flags: MessageFlags.IsComponentsV2 as const,
+	};
+}
+
+/**
+ * Discord's size for each {@link Separator} spacing.
+ */
+const SEPARATOR_SPACINGS = { large: SeparatorSpacingSize.Large, small: SeparatorSpacingSize.Small };
+
+/**
+ * A name for each of `images` that Discord can link to: anything but letters, digits, `.`, `-`, and `_`
+ * becomes `_`, and a name already taken by another image gets a number in front, such as "2-map.png".
+ */
+function attachmentNames(images: Image[]): Map<Image, string> {
+	const names = new Map<Image, string>();
+	const taken = new Set<string>();
+	for (const image of images) {
+		const base = image.name.replace(/[^\w.-]/gu, '_');
+		let name = base;
+		for (let n = 2; taken.has(name); n++) name = `${n}-${base}`;
+		taken.add(name);
+		names.set(image, name);
+	}
+	return names;
 }
