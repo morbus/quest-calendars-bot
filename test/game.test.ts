@@ -25,6 +25,13 @@ function image(path: string): Image {
 }
 
 /**
+ * Each of `reply`'s buttons by label, and whether it can be pressed.
+ */
+function buttonStates(reply: Reply): { disabled: boolean; label: string }[] | undefined {
+	return reply.buttons?.map(({ disabled, label }) => ({ disabled: disabled ?? false, label }));
+}
+
+/**
  * A Game with in-memory storage and the given Quests.
  */
 function newGame(quests: Quest[] = QUESTS): Game {
@@ -51,14 +58,11 @@ test('/quest start shows the first Quest on its own, with buttons to choose it o
 		footer: 'Quest 1 of 2',
 		title: 'The Amber Road',
 	});
-	assert.deepEqual(
-		reply.buttons?.map(({ disabled, label }) => ({ disabled: disabled ?? false, label })),
-		[
-			{ disabled: false, label: 'Previous' },
-			{ disabled: false, label: 'Choose this Quest' },
-			{ disabled: false, label: 'Next' },
-		],
-	);
+	assert.deepEqual(buttonStates(reply), [
+		{ disabled: false, label: 'Previous' },
+		{ disabled: false, label: 'Choose this Quest' },
+		{ disabled: false, label: 'Next' },
+	]);
 });
 
 /**
@@ -84,14 +88,11 @@ test('Next shows the next Quest, with its image, and Previous goes back', () => 
 		image: image('clockwork-tower/tower.png'),
 		title: 'The Clockwork Tower',
 	});
-	assert.deepEqual(
-		second.buttons?.map(({ disabled, label }) => ({ disabled: disabled ?? false, label })),
-		[
-			{ disabled: false, label: 'Previous' },
-			{ disabled: false, label: 'Choose this Quest' },
-			{ disabled: false, label: 'Next' },
-		],
-	);
+	assert.deepEqual(buttonStates(second), [
+		{ disabled: false, label: 'Previous' },
+		{ disabled: false, label: 'Choose this Quest' },
+		{ disabled: false, label: 'Next' },
+	]);
 	assert.deepEqual(press(game, second, 'Previous'), first);
 });
 
@@ -133,14 +134,11 @@ test('choosing a Quest shows its first Character on its own, with their Stats, T
 		footer: 'Character 1 of 2 in The Clockwork Tower',
 		title: 'Iron Warden',
 	});
-	assert.deepEqual(
-		reply.buttons?.map(({ disabled, label }) => ({ disabled: disabled ?? false, label })),
-		[
-			{ disabled: false, label: 'Previous' },
-			{ disabled: false, label: 'Choose this Character' },
-			{ disabled: false, label: 'Next' },
-		],
-	);
+	assert.deepEqual(buttonStates(reply), [
+		{ disabled: false, label: 'Previous' },
+		{ disabled: false, label: 'Choose this Character' },
+		{ disabled: false, label: 'Next' },
+	]);
 });
 
 test('Next shows the next Character, with their image, and Previous and Next wrap around', () => {
@@ -175,14 +173,11 @@ test('a Quest with one Character disables Previous and Next', () => {
 
 	const reply = chooseQuest(game, 'The Amber Road');
 
-	assert.deepEqual(
-		reply.buttons?.map(({ disabled, label }) => ({ disabled: disabled ?? false, label })),
-		[
-			{ disabled: true, label: 'Previous' },
-			{ disabled: false, label: 'Choose this Character' },
-			{ disabled: true, label: 'Next' },
-		],
-	);
+	assert.deepEqual(buttonStates(reply), [
+		{ disabled: true, label: 'Previous' },
+		{ disabled: false, label: 'Choose this Character' },
+		{ disabled: true, label: 'Next' },
+	]);
 });
 
 test('a Character with no Abilities says so', () => {

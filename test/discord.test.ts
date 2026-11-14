@@ -160,12 +160,18 @@ test('sections that would join to 2001 characters, counting the blank line, go i
 	);
 });
 
-test("a message's images are sent as attachments with their bytes and names, and its buttons as rows", () => {
+test("a message's images are sent as attachments with their bytes and names, its buttons as rows, and no embed", () => {
 	const tower = { data: Buffer.from('tower bytes'), name: 'tower.png' };
 
-	const { components, content, files } = toDiscord({ buttonRows: [buttons(2)], content: 'Choose.', files: [tower] });
+	const { components, content, embeds, files } = toDiscord({
+		buttonRows: [buttons(2)],
+		content: 'Choose.',
+		files: [tower],
+	});
 
 	assert.equal(content, 'Choose.');
+	// An empty list, not none, so a reply that replaces a card clears it.
+	assert.deepEqual(embeds, []);
 	assert.deepEqual(files, [{ attachment: Buffer.from('tower bytes'), name: 'tower.png' }]);
 	// What Discord receives, as discord.js serializes it.
 	assert.deepEqual(JSON.parse(JSON.stringify(components)), [
@@ -276,4 +282,10 @@ test("a card whose image doesn't fit with the last message's images starts a new
 			{ buttons: 1, card: 'Tower', files: 1 },
 		],
 	);
+});
+
+test("a card's description is cut between graphemes, so an emoji at the limit is left out whole", () => {
+	const embed = embedFor({ description: `${'x'.repeat(4094)}🇯🇵`, fields: [], footer: 'Quest 1 of 1', title: 'Tower' });
+
+	assert.equal(embed.description, `${'x'.repeat(4094)}…`);
 });
