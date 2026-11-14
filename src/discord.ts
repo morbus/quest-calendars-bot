@@ -247,7 +247,7 @@ function lastGraphemeBreak(text: string): number {
 /**
  * Builds a {@link Message} with discord.js.
  */
-function toDiscord({ buttonRows, content, files }: Message) {
+export function toDiscord({ buttonRows, content, files }: Message) {
 	const components = buttonRows.map((row) =>
 		new ActionRowBuilder<ButtonBuilder>().addComponents(
 			row.map((button) =>

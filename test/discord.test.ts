@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toMessages } from '../src/discord.ts';
+import { toDiscord, toMessages } from '../src/discord.ts';
 import type { Button } from '../src/game.ts';
 import type { Image } from '../src/registry.ts';
 
@@ -158,4 +158,23 @@ test('sections that would join to 2001 characters, counting the blank line, go i
 		messages.map((message) => message.content.length),
 		[999, 1000],
 	);
+});
+
+test("a message's images are sent as attachments with their bytes and names, and its buttons as rows", () => {
+	const tower = { data: Buffer.from('tower bytes'), name: 'tower.png' };
+
+	const { components, content, files } = toDiscord({ buttonRows: [buttons(2)], content: 'Choose.', files: [tower] });
+
+	assert.equal(content, 'Choose.');
+	assert.deepEqual(files, [{ attachment: Buffer.from('tower bytes'), name: 'tower.png' }]);
+	// What Discord receives, as discord.js serializes it.
+	assert.deepEqual(JSON.parse(JSON.stringify(components)), [
+		{
+			components: [
+				{ custom_id: 'b1', label: 'Button 1', style: 1, type: 2 },
+				{ custom_id: 'b2', label: 'Button 2', style: 1, type: 2 },
+			],
+			type: 1,
+		},
+	]);
 });
