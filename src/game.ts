@@ -3,7 +3,7 @@
  */
 
 import { TRAITS, type Character } from './builder.ts';
-import type { Quest } from './registry.ts';
+import type { Image, Loaded, Quest } from './registry.ts';
 import type { Storage } from './storage.ts';
 
 /**
@@ -33,9 +33,9 @@ export type Reply = {
  */
 export type Section = {
 	/**
-	 * The full path of an image file to show with it.
+	 * An image to show with it.
 	 */
-	image?: string;
+	image?: Image;
 	/**
 	 * What the paragraph says.
 	 */
@@ -136,7 +136,7 @@ function listCharacters(quest: Quest): Reply {
 /**
  * A Character's name and description, then a line each for their Stats, Traits, and Abilities.
  */
-function describeCharacter({ abilities, description, name, stats, traits }: Character): string {
+function describeCharacter({ abilities, description, name, stats, traits }: Loaded<Character>): string {
 	return [
 		name,
 		description,
@@ -150,7 +150,7 @@ function describeCharacter({ abilities, description, name, stats, traits }: Char
 /**
  * A section that says `text`, with the image of the Quest or Character it's about, if any.
  */
-function section({ image }: { image?: string }, text: string): Section {
+function section({ image }: { image?: Image }, text: string): Section {
 	return image === undefined ? { text } : { image, text };
 }
 

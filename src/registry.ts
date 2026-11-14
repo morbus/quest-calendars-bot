@@ -2,9 +2,9 @@
  * The Quest registry: loads every Quest directory at startup and rejects invalid content.
  */
 
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RULE_MODULES, TRAITS, type Character, type QuestMetadata } from './builder.ts';
 
@@ -39,13 +39,42 @@ const IMAGE_EXTENSIONS = ['.gif', '.jpeg', '.jpg', '.png', '.webp'];
 const DICE = /^([1-9]\d*)?d[1-9]\d*$/;
 
 /**
+ * An image, read when the bot starts.
+ */
+export type Image = {
+	/**
+	 * The image file's bytes.
+	 */
+	data: Buffer;
+	/**
+	 * The image file's name, such as "tower.png".
+	 */
+	name: string;
+};
+
+/**
+ * The most bytes of images Discord takes in one message, and so the largest image.
+ */
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Quest metadata or a Character as loaded, with its image read in place of the authored path.
+ */
+export type Loaded<T extends { image?: string }> = Omit<T, 'image'> & {
+	/**
+	 * The image to show with it, if any.
+	 */
+	image?: Image;
+};
+
+/**
  * A loaded Quest: its metadata and its Characters.
  */
-export type Quest = QuestMetadata & {
+export type Quest = Loaded<QuestMetadata> & {
 	/**
 	 * The Quest's Characters, sorted by name.
 	 */
-	characters: Character[];
+	characters: Loaded<Character>[];
 };
 
 /**
@@ -79,7 +108,7 @@ async function loadQuestsIn(dir: string, claims: Claims): Promise<Quest[]> {
 		const metadataFile = join(questDir, 'quest.ts');
 		const metadata = await loadFile(metadataFile, checkMetadata);
 		claim(claims, metadata, metadataFile);
-		const characters: Character[] = [];
+		const characters: Loaded<Character>[] = [];
 		const characterClaims = newClaims();
 		const characterFiles = await readdir(join(questDir, 'characters')).catch((error) => {
 			if (error.code === 'ENOENT') return [];
@@ -156,11 +185,11 @@ async function loadFile<T>(file: string, check: (value: unknown, file: string) =
 }
 
 /**
- * Accepts valid Quest metadata from `file`, with its image's full path.
+ * Accepts valid Quest metadata from `file`, with its image read.
  *
  * @throws When it isn't.
  */
-function checkMetadata(value: unknown, file: string): QuestMetadata {
+function checkMetadata(value: unknown, file: string): Loaded<QuestMetadata> {
 	checkObject('the default export', value);
 	const metadata = value as QuestMetadata;
 	checkId(metadata.id);
@@ -185,11 +214,11 @@ function checkMetadata(value: unknown, file: string): QuestMetadata {
 }
 
 /**
- * Accepts a valid Character from `file`, with its image's full path.
+ * Accepts a valid Character from `file`, with its image read.
  *
  * @throws When it isn't.
  */
-function checkCharacter(value: unknown, file: string): Character {
+function checkCharacter(value: unknown, file: string): Loaded<Character> {
 	checkObject('the default export', value);
 	const character = value as Character;
 	checkId(character.id);
@@ -213,19 +242,24 @@ function checkCharacter(value: unknown, file: string): Character {
 }
 
 /**
- * `declared`, with its image, if any, as the full path of a file beside `file`.
+ * `declared`, with its image, if any, read from beside `file`.
  *
- * @throws When the image isn't an image file, or doesn't exist.
+ * @remarks
+ * Reading it now means a reply still shows it if the file moves while the bot runs.
+ *
+ * @throws When the image isn't an image file, doesn't exist, or is too large for Discord.
  */
-function withImage<T extends { image?: string }>(declared: T, file: string): T {
-	const { image } = declared;
-	if (image === undefined) return declared;
+function withImage<T extends { image?: string }>(declared: T, file: string): Loaded<T> {
+	const { image, ...rest } = declared;
+	if (image === undefined) return rest;
 	if (typeof image !== 'string' || !IMAGE_EXTENSIONS.includes(extname(image).toLowerCase())) {
 		fail('image', `a ${IMAGE_EXTENSIONS.slice(0, -1).join(', ')}, or ${IMAGE_EXTENSIONS.at(-1)} file`, image);
 	}
 	const path = resolve(dirname(file), image);
-	if (!statSync(path, { throwIfNoEntry: false })?.isFile()) fail('image', 'a file beside this one', image);
-	return { ...declared, image: path };
+	const stats = statSync(path, { throwIfNoEntry: false });
+	if (!stats?.isFile()) fail('image', 'a file beside this one', image);
+	if (stats.size > MAX_IMAGE_BYTES) fail('image', `at most ${MAX_IMAGE_BYTES / 1024 / 1024} MiB`, image);
+	return { ...rest, image: { data: readFileSync(path), name: basename(path) } };
 }
 
 /**

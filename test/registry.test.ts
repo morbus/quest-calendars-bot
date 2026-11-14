@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtempDisposable, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtempDisposable, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -450,4 +450,41 @@ test('25 Quests load, as many as /quest start can show as buttons', async () => 
 
 test('more than 25 Quests fail to load', async () => {
 	await assert.rejects(load(questsNumbered(26)), /26 Quests are more than the 25 \/quest start can show/);
+});
+
+/**
+ * Writes a Quest into `dir` whose image, map.png, is `bytes` bytes.
+ */
+async function writeQuestWithImage(dir: string, bytes: number): Promise<void> {
+	await mkdir(join(dir, 'quest-1', 'characters'), { recursive: true });
+	await writeFile(join(dir, 'quest-1', 'quest.ts'), source('quest', { ...METADATA, image: 'map.png' }));
+	await writeFile(join(dir, 'quest-1', 'map.png'), Buffer.alloc(bytes));
+	await writeFile(join(dir, 'quest-1', 'characters', 'pilgrim.ts'), source('character', CHARACTER));
+}
+
+/**
+ * Writes one Quest whose image is `bytes` bytes, and loads it.
+ */
+async function loadWithImage(bytes: number): Promise<unknown> {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await writeQuestWithImage(dir.path, bytes);
+	return await loadQuests([dir.path]);
+}
+
+test('an image of 8 MiB loads', async () => {
+	await assert.doesNotReject(loadWithImage(8 * 1024 * 1024));
+});
+
+test('an image over 8 MiB, more than Discord takes in a message, fails to load', async () => {
+	await assert.rejects(loadWithImage(8 * 1024 * 1024 + 1), /quest\.ts: image must be at most 8 MiB, not "map\.png"/);
+});
+
+test('an image moved after startup still shows, since it was read at startup', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await writeQuestWithImage(dir.path, 16);
+	const [quest] = await loadQuests([dir.path]);
+
+	await rm(join(dir.path, 'quest-1', 'map.png'));
+
+	assert.deepEqual(quest?.image, { data: Buffer.alloc(16), name: 'map.png' });
 });

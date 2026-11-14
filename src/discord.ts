@@ -16,6 +16,7 @@ import {
 	type ChatInputCommandInteraction,
 } from 'discord.js';
 import type { Button, Game, Input, Reply } from './game.ts';
+import { MAX_IMAGE_BYTES, type Image } from './registry.ts';
 import { logger } from './log.ts';
 
 /**
@@ -51,9 +52,9 @@ export type Message = {
 	 */
 	content: string;
 	/**
-	 * The full paths of the images to attach, at most {@link MAX_FILES}.
+	 * The images to attach: at most {@link MAX_FILES}, of at most {@link MAX_IMAGE_BYTES} together.
 	 */
-	files: string[];
+	files: Image[];
 };
 
 /**
@@ -173,9 +174,8 @@ export function toMessages(reply: Reply): Message[] {
 		for (const [i, text] of splitText(section.text).entries()) {
 			const files = i === 0 && section.image !== undefined ? [section.image] : [];
 			const last = messages.at(-1);
-			const joined = last && `${last.content}\n\n${text}`;
-			if (last && joined && joined.length <= MAX_CONTENT_LENGTH && last.files.length + files.length <= MAX_FILES) {
-				last.content = joined;
+			if (last !== undefined && fitsIn(last, text, files)) {
+				last.content += `\n\n${text}`;
 				last.files.push(...files);
 			} else {
 				messages.push({ buttonRows: [], content: text, files });
@@ -187,6 +187,25 @@ export function toMessages(reply: Reply): Message[] {
 		messages.at(-1)?.buttonRows.push(buttons.slice(i, i + BUTTONS_PER_ROW));
 	}
 	return messages;
+}
+
+/**
+ * Whether `message` has room for `text`, after a blank line, and `files`.
+ */
+function fitsIn(message: Message, text: string, files: Image[]): boolean {
+	const all = [...message.files, ...files];
+	return (
+		message.content.length + 2 + text.length <= MAX_CONTENT_LENGTH &&
+		all.length <= MAX_FILES &&
+		bytes(all) <= MAX_IMAGE_BYTES
+	);
+}
+
+/**
+ * How many bytes `images` hold together.
+ */
+function bytes(images: Image[]): number {
+	return images.reduce((total, image) => total + image.data.length, 0);
 }
 
 /**
@@ -231,5 +250,5 @@ function toDiscord({ buttonRows, content, files }: Message) {
 			),
 		),
 	);
-	return { components, content, files };
+	return { components, content, files: files.map(({ data, name }) => ({ attachment: data, name })) };
 }

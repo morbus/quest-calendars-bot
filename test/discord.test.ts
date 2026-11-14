@@ -2,6 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { toMessages } from '../src/discord.ts';
 import type { Button } from '../src/game.ts';
+import type { Image } from '../src/registry.ts';
+
+/**
+ * An image named `name`, of `bytes` bytes.
+ */
+function image(name: string, bytes = 1): Image {
+	return { data: Buffer.alloc(bytes), name };
+}
 
 /**
  * `count` buttons, with ids b1 and on.
@@ -39,19 +47,19 @@ test("a section's image is attached to the message that holds its text", () => {
 	const messages = toMessages({
 		sections: [
 			{ text: 'Choose.' },
-			{ image: '/quests/tower.png', text: long },
-			{ image: '/quests/road.png', text: long },
+			{ image: image('tower.png'), text: long },
+			{ image: image('road.png'), text: long },
 		],
 	});
 
 	assert.deepEqual(messages, [
-		{ buttonRows: [], content: `Choose.\n\n${long}`, files: ['/quests/tower.png'] },
-		{ buttonRows: [], content: long, files: ['/quests/road.png'] },
+		{ buttonRows: [], content: `Choose.\n\n${long}`, files: [image('tower.png')] },
+		{ buttonRows: [], content: long, files: [image('road.png')] },
 	]);
 });
 
 test('a message holds at most 10 images', () => {
-	const sections = Array.from({ length: 11 }, (_, i) => ({ image: `/quests/${i + 1}.png`, text: `${i + 1}` }));
+	const sections = Array.from({ length: 11 }, (_, i) => ({ image: image(`${i + 1}.png`), text: `${i + 1}` }));
 
 	const messages = toMessages({ sections });
 
@@ -82,11 +90,11 @@ test('sections that join to exactly 2000 characters stay in one message', () => 
 });
 
 test("a split section's image is attached once, to its first part", () => {
-	const messages = toMessages({ sections: [{ image: '/quests/tower.png', text: 'x'.repeat(2500) }] });
+	const messages = toMessages({ sections: [{ image: image('tower.png'), text: 'x'.repeat(2500) }] });
 
 	assert.deepEqual(
 		messages.map((message) => message.files),
-		[['/quests/tower.png'], []],
+		[[image('tower.png')], []],
 	);
 });
 
@@ -124,5 +132,30 @@ test('a split that leaves only blank text sends no empty message', () => {
 	assert.deepEqual(
 		messages.map((message) => message.content),
 		['x'.repeat(2000)],
+	);
+});
+
+test('images that together go over 8 MiB start a new message', () => {
+	const fourMiB = 4 * 1024 * 1024;
+	const sections = [
+		{ image: image('a.png', fourMiB), text: 'A' },
+		{ image: image('b.png', fourMiB), text: 'B' },
+		{ image: image('c.png', 1), text: 'C' },
+	];
+
+	const messages = toMessages({ sections });
+
+	assert.deepEqual(
+		messages.map((message) => message.content),
+		['A\n\nB', 'C'],
+	);
+});
+
+test('sections that would join to 2001 characters, counting the blank line, go in two messages', () => {
+	const messages = toMessages({ sections: [{ text: 'x'.repeat(999) }, { text: 'y'.repeat(1000) }] });
+
+	assert.deepEqual(
+		messages.map((message) => message.content.length),
+		[999, 1000],
 	);
 });

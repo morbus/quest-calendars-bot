@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createGame, type Game, type Reply } from '../src/game.ts';
-import { loadQuests, type Quest } from '../src/registry.ts';
+import { loadQuests, type Image, type Quest } from '../src/registry.ts';
 import { openStorage } from '../src/storage.ts';
 
 /**
@@ -16,10 +18,10 @@ const NOW = new Date('2026-11-13T09:00:00Z');
 const QUESTS = await loadQuests([fileURLToPath(new URL('fixtures/quests/', import.meta.url))]);
 
 /**
- * The path of a file in the fixture Quests, as a Reply's image refers to it.
+ * An image file in the fixture Quests, as a Reply carries it.
  */
-function fixture(path: string): string {
-	return fileURLToPath(new URL(`fixtures/quests/${path}`, import.meta.url));
+function image(path: string): Image {
+	return { data: readFileSync(new URL(`fixtures/quests/${path}`, import.meta.url)), name: basename(path) };
 }
 
 /**
@@ -46,7 +48,7 @@ test('/quest start describes each Quest and offers it as a button, by name', () 
 		{ text: 'Choose a Quest.' },
 		{ text: 'The Amber Road\nA pilgrimage along the old trade road.' },
 		{
-			image: fixture('clockwork-tower/tower.png'),
+			image: image('clockwork-tower/tower.png'),
 			text: 'The Clockwork Tower\nClimb a tower of gears before it strikes midnight.',
 		},
 	]);
@@ -84,7 +86,7 @@ test('choosing a Quest lists its Characters, by name, with their descriptions, S
 			].join('\n'),
 		},
 		{
-			image: fixture('clockwork-tower/characters/tinker.PNG'),
+			image: image('clockwork-tower/characters/tinker.PNG'),
 			text: [
 				'Tinker',
 				'Builds what the tower breaks.',

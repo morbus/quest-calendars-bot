@@ -37,8 +37,8 @@ export type QuestMetadata = {
 	 */
 	id: string;
 	/**
-	 * An image to show with it, such as a map or a portrait: a .gif, .jpeg, .jpg, .png, or .webp file,
-	 * relative to this file. Once loaded, the file's full path.
+	 * An image to show with it, such as a map or a portrait: a .gif, .jpeg, .jpg, .png, or .webp file
+	 * of at most 8 MiB, relative to this file.
 	 */
 	image?: string;
 	/**
@@ -118,8 +118,8 @@ export type Character = {
 	 */
 	id: string;
 	/**
-	 * An image to show with it, such as a map or a portrait: a .gif, .jpeg, .jpg, .png, or .webp file,
-	 * relative to this file. Once loaded, the file's full path.
+	 * An image to show with it, such as a map or a portrait: a .gif, .jpeg, .jpg, .png, or .webp file
+	 * of at most 8 MiB, relative to this file.
 	 */
 	image?: string;
 	/**
