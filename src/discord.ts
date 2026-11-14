@@ -200,17 +200,22 @@ function count(parts: Component[]): number {
 }
 
 /**
- * Every text in `parts`, in order.
- */
-function textsIn(parts: Component[]): TextDisplay[] {
-	return partsIn(parts).filter((part) => part.type === 'textDisplay');
-}
-
-/**
- * How many characters of text `parts` hold together.
+ * How many characters of text `parts` hold together: their texts, button labels, and image descriptions.
+ *
+ * @remarks
+ * Discord's docs don't say whether labels and descriptions count toward {@link MAX_TEXT_LENGTH},
+ * so they're counted, to be safe either way.
  */
 function textLength(parts: Component[]): number {
-	return textsIn(parts).reduce((total, { content }) => total + content.length, 0);
+	return partsIn(parts)
+		.flatMap((part) => {
+			if (part.type === 'textDisplay') return [part.content];
+			if (part.type === 'button' || part.type === 'linkButton') return [part.label];
+			if (part.type === 'thumbnail') return [part.description ?? ''];
+			if (part.type === 'mediaGallery') return part.items.map(({ description }) => description ?? '');
+			return [];
+		})
+		.reduce((total, text) => total + text.length, 0);
 }
 
 /**

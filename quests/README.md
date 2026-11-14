@@ -48,7 +48,7 @@ export default quest({
 
 Every text, such as a name, a description, or the `currency`, must hold more than spaces, tabs, or line breaks.
 No two Quests may share an id or a name, even across the directories QUESTS_DIR lists.
-Each Quest's and each Character's screen must fit in one Discord message: at most 4,000 characters of text in all, counting its name, description, and, for a Character, Stats, Traits, and Abilities.
+Each Quest's and each Character's screen must fit in one Discord message: at most 4,000 characters of text in all, counting its name, description, and, for a Character, Stats, Traits, and Abilities, as well as its button labels and image descriptions.
 The bot won't start while a screen is too long, and its error names the file and how many characters the screen has.
 
 ## characters/
