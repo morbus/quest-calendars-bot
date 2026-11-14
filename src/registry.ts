@@ -55,10 +55,9 @@ export type Quest = QuestMetadata & {
  */
 export async function loadQuests(dirs: string[]): Promise<Quest[]> {
 	const quests: Quest[] = [];
-	const questIds = new Map<string, string>();
-	const questNames = new Map<string, string>();
+	const claims = newClaims();
 	for (const dir of dirs) {
-		quests.push(...(await loadQuestDirs(dir, questIds, questNames)));
+		quests.push(...(await loadQuestsIn(dir, claims)));
 	}
 	if (quests.length > MAX_QUESTS) {
 		throw new Error(`${quests.length} Quests are more than the ${MAX_QUESTS} /quest start can show`);
@@ -67,15 +66,11 @@ export async function loadQuests(dirs: string[]): Promise<Quest[]> {
 }
 
 /**
- * Loads every Quest directory in `dir`, claiming each Quest's id and name.
+ * Loads every Quest directory in `dir`, claiming each Quest's id and name in `claims`.
  *
  * @throws When a Quest is invalid, naming the file at fault and the problem.
  */
-async function loadQuestDirs(
-	dir: string,
-	questIds: Map<string, string>,
-	questNames: Map<string, string>,
-): Promise<Quest[]> {
+async function loadQuestsIn(dir: string, claims: Claims): Promise<Quest[]> {
 	const quests: Quest[] = [];
 	for (const entry of await readdir(dir)) {
 		const questDir = join(dir, entry);
@@ -83,11 +78,9 @@ async function loadQuestDirs(
 		if (entry.startsWith('.') || !(await stat(questDir)).isDirectory()) continue;
 		const metadataFile = join(questDir, 'quest.ts');
 		const metadata = await loadFile(metadataFile, checkMetadata);
-		claim(questIds, 'id', metadata.id, metadataFile);
-		claim(questNames, 'name', metadata.name, metadataFile);
+		claim(claims, metadata, metadataFile);
 		const characters: Character[] = [];
-		const characterIds = new Map<string, string>();
-		const characterNames = new Map<string, string>();
+		const characterClaims = newClaims();
 		const characterFiles = await readdir(join(questDir, 'characters')).catch((error) => {
 			if (error.code === 'ENOENT') return [];
 			throw error;
@@ -96,8 +89,7 @@ async function loadQuestDirs(
 			if (name.startsWith('.') || !name.endsWith('.ts')) continue;
 			const file = join(questDir, 'characters', name);
 			const character = await loadFile(file, checkCharacter);
-			claim(characterIds, 'id', character.id, file);
-			claim(characterNames, 'name', character.name, file);
+			claim(characterClaims, character, file);
 			characters.push(character);
 		}
 		if (characters.length === 0) throw new Error(`${join(questDir, 'characters')}: has no Characters`);
@@ -114,14 +106,40 @@ function byName(a: { name: string }, b: { name: string }): number {
 }
 
 /**
- * Records that `file` declares `value` as its `field`, such as its id.
- *
- * @throws When an earlier file in `claimed` declared the same value.
+ * The ids and names of Quests, or of one Quest's Characters, each with the file that declared it.
  */
-function claim(claimed: Map<string, string>, field: 'id' | 'name', value: string, file: string): void {
-	const earlier = claimed.get(value);
-	if (earlier) throw new Error(`${file}: ${field} ${value} is already used by ${earlier}`);
-	claimed.set(value, file);
+type Claims = {
+	/**
+	 * The file that declared each id.
+	 */
+	ids: Map<string, string>;
+	/**
+	 * The file that declared each name.
+	 */
+	names: Map<string, string>;
+};
+
+/**
+ * {@link Claims} with nothing claimed yet.
+ */
+function newClaims(): Claims {
+	return { ids: new Map(), names: new Map() };
+}
+
+/**
+ * Records that `file` declares a Quest or Character with this `id` and `name`.
+ *
+ * @throws When an earlier file in `claims` declared the same id or name.
+ */
+function claim(claims: Claims, { id, name }: { id: string; name: string }, file: string): void {
+	for (const [field, claimed, value] of [
+		['id', claims.ids, id],
+		['name', claims.names, name],
+	] as const) {
+		const earlier = claimed.get(value);
+		if (earlier) throw new Error(`${file}: ${field} ${value} is already used by ${earlier}`);
+		claimed.set(value, file);
+	}
 }
 
 /**
@@ -203,7 +221,7 @@ function withImage<T extends { image?: string }>(declared: T, file: string): T {
 	const { image } = declared;
 	if (image === undefined) return declared;
 	if (typeof image !== 'string' || !IMAGE_EXTENSIONS.includes(extname(image).toLowerCase())) {
-		fail('image', 'a .gif, .jpeg, .jpg, .png, or .webp file', image);
+		fail('image', `a ${IMAGE_EXTENSIONS.slice(0, -1).join(', ')}, or ${IMAGE_EXTENSIONS.at(-1)} file`, image);
 	}
 	const path = resolve(dirname(file), image);
 	if (!statSync(path, { throwIfNoEntry: false })?.isFile()) fail('image', 'a file beside this one', image);

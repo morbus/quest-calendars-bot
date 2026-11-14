@@ -101,16 +101,16 @@ export function createGame({ quests, storage }: { quests: Quest[]; storage: Stor
 }
 
 /**
- * Offers each Quest as a button, or says none are ready yet.
+ * Describes each Quest, with its image, and offers it as a button, or says none are ready yet.
  */
 function listQuests(quests: Quest[]): Reply {
 	if (quests.length === 0) return { sections: [{ text: 'Quests are coming soon.' }] };
 	return {
+		buttons: quests.map((quest) => ({ id: questButtonId(quest), label: quest.name })),
 		sections: [
 			{ text: 'Choose a Quest.' },
 			...quests.map((quest) => section(quest, `${quest.name}\n${quest.description}`)),
 		],
-		buttons: quests.map((quest) => ({ id: questButtonId(quest), label: quest.name })),
 	};
 }
 
@@ -122,7 +122,7 @@ function questButtonId(quest: Quest): string {
 }
 
 /**
- * Shows each of a Quest's Characters with their Stats, Traits, and Abilities.
+ * Shows each of a Quest's Characters with their description, image, Stats, Traits, and Abilities.
  */
 function listCharacters(quest: Quest): Reply {
 	return {

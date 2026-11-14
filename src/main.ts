@@ -34,11 +34,11 @@ const EXIT_GRACE_MS = 1000;
  * to exit shortly after, in case something such as the Discord client still holds Node open.
  */
 async function main(): Promise<void> {
-	const { DISCORD_TOKEN: token, GAME_TIMEZONE: timezone, QUESTS_DIR: questsDir } = process.env;
+	const { DISCORD_TOKEN: token, GAME_TIMEZONE: timezone, QUESTS_DIR: questsPath } = process.env;
 	logger.info('Starting Quest Calendars Bot');
 
-	if (!token || !timezone || !questsDir) {
-		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE', !questsDir && 'QUESTS_DIR'].filter(
+	if (!token || !timezone || !questsPath) {
+		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE', !questsPath && 'QUESTS_DIR'].filter(
 			Boolean,
 		);
 		logger.error(`Missing environment variables: ${missing.join(', ')}`);
@@ -63,7 +63,7 @@ async function main(): Promise<void> {
 	logger.info('Opened game state', { from: DB_FILE });
 
 	// Like PATH, QUESTS_DIR lists directories separated by colons.
-	const questDirs = questsDir.split(':').map((dir) => resolve(PROJECT_DIR, dir));
+	const questDirs = questsPath.split(':').map((dir) => resolve(PROJECT_DIR, dir));
 	let quests;
 	try {
 		quests = await loadQuests(questDirs);
