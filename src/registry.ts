@@ -58,6 +58,10 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
  */
 export type Loaded<T extends { image?: string }> = Omit<T, 'image'> & {
 	/**
+	 * The file that declared it, such as a Quest's `quest.ts`, to name in errors.
+	 */
+	file: string;
+	/**
 	 * The image to show with it, if any.
 	 */
 	image?: Image;
@@ -235,7 +239,8 @@ function checkCharacter(value: unknown, file: string, questDir: string): Loaded<
 }
 
 /**
- * `declared`, with its image, if any, read from its path relative to `file`, which must stay in `questDir`.
+ * `declared`, as declared in `file`, with its image, if any, read from its path relative to `file`,
+ * which must stay in `questDir`.
  *
  * @remarks
  * Reading it now means a reply still shows it if the file moves while the bot runs.
@@ -244,7 +249,7 @@ function checkCharacter(value: unknown, file: string, questDir: string): Loaded<
  */
 function withImage<T extends { image?: string }>(declared: T, file: string, questDir: string): Loaded<T> {
 	const { image, ...rest } = declared;
-	if (image === undefined) return rest;
+	if (image === undefined) return { ...rest, file };
 	if (typeof image !== 'string' || !IMAGE_EXTENSIONS.includes(extname(image).toLowerCase())) {
 		fail('image', `a ${IMAGE_EXTENSIONS.slice(0, -1).join(', ')}, or ${IMAGE_EXTENSIONS.at(-1)} file`, image);
 	}
@@ -268,7 +273,7 @@ function withImage<T extends { image?: string }>(declared: T, file: string, ques
 	if (statSync(realPath).size > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
 	const data = readFileSync(realPath);
 	if (data.length > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
-	return { ...rest, image: { data, name: basename(path) } };
+	return { ...rest, file, image: { data, name: basename(path) } };
 }
 
 /**

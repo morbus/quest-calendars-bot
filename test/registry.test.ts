@@ -69,6 +69,16 @@ test('Quests load, skipping files that are not Quest directories or Character fi
 	await assert.doesNotReject(loadQuests([fileURLToPath(new URL('fixtures/quests/', import.meta.url))]));
 });
 
+test('each loaded Quest and Character remembers the file that declared it', async () => {
+	const fixtures = fileURLToPath(new URL('fixtures/quests/', import.meta.url));
+
+	// The Amber Road, in pilgrimage/, sorts first.
+	const [pilgrimage] = await loadQuests([fixtures]);
+
+	assert.equal(pilgrimage?.file, join(fixtures, 'pilgrimage', 'quest.ts'));
+	assert.equal(pilgrimage?.characters[0]?.file, join(fixtures, 'pilgrimage', 'characters', 'pilgrim.ts'));
+});
+
 test('a Quest that turns on an unknown Rule Module fails to load', async () => {
 	await assert.rejects(
 		load([{ metadata: { ...METADATA, ruleModules: ['minions'] } }]),

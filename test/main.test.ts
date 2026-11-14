@@ -96,3 +96,23 @@ test('startup fails, naming the file, when a Quest in any QUESTS_DIR directory i
 		/nameless\/quest\.ts: id must be letters a–z and digits 0–9, with single hyphens between them, not undefined/,
 	);
 });
+
+test("startup fails, naming each file, when a Quest's or Character's screen has more text than Discord shows", async () => {
+	const { code, output } = await start({
+		DISCORD_TOKEN: 'token',
+		GAME_TIMEZONE: 'UTC',
+		QUESTS_DIR: 'test/fixtures/quests:test/fixtures/long-quests',
+	});
+
+	assert.equal(code, 1);
+	for (const file of ['quest.ts', 'characters/archivist.ts', 'characters/reader.ts']) {
+		assert.match(
+			output,
+			new RegExp(
+				`Quest can't be shown in Discord: \\S*endless-library/${file.replace('.', '\\.')}: its screen has [\\d,]+ characters of text, more than the 4,000 Discord shows in one message`,
+			),
+		);
+	}
+	assert.doesNotMatch(output, /clockwork-tower|pilgrimage/);
+	assert.doesNotMatch(output, /Logged in/);
+});

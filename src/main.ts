@@ -2,8 +2,8 @@
  * Start the bot with `npm start` using `.env` variables.
  */
 
-import { startBot } from './discord.ts';
-import { createGame } from './game.ts';
+import { brokenLimits, startBot } from './discord.ts';
+import { createGame, everyScreen } from './game.ts';
 import { logger } from './log.ts';
 import { loadQuests } from './registry.ts';
 import { openStorage } from './storage.ts';
@@ -73,6 +73,16 @@ async function main(): Promise<void> {
 		return;
 	}
 	logger.info('Loaded Quests', { quests: quests.map((quest) => quest.name) });
+
+	// Authors shorten what doesn't fit, rather than Players seeing it cut short.
+	const unshowable = everyScreen(quests).flatMap(({ file, reply }) =>
+		brokenLimits(reply).map((problem) => `${file}: its screen has ${problem}`),
+	);
+	if (unshowable.length > 0) {
+		for (const problem of unshowable) logger.error(`Quest can't be shown in Discord: ${problem}`);
+		process.exitCode = 1;
+		return;
+	}
 
 	await startBot({ game: createGame({ quests, storage }), token });
 }

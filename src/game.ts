@@ -224,3 +224,14 @@ function signed(modifier: number): string {
 function capitalize(word: string): string {
 	return word.charAt(0).toUpperCase() + word.slice(1);
 }
+
+/**
+ * Every screen of every Quest and Character, as Players see it, with the file that declared what it shows,
+ * so startup can check each fits on Discord.
+ */
+export function everyScreen(quests: Quest[]): { file: string; reply: Reply }[] {
+	return quests.flatMap((quest, index) => [
+		{ file: quest.file, reply: showQuest(quests, index) },
+		...quest.characters.map((character, i) => ({ file: character.file, reply: showCharacter(quest, i) })),
+	]);
+}

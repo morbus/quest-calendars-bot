@@ -40,11 +40,6 @@ const MAX_FILES = 10;
 const MAX_TEXT_LENGTH = 4000;
 
 /**
- * Splits text into graphemes, the characters a reader sees, keeping emoji such as flags whole.
- */
-const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
-
-/**
  * Discord's color for each {@link Button} style.
  */
 const BUTTON_STYLES = {
@@ -53,17 +48,6 @@ const BUTTON_STYLES = {
 	secondary: ButtonStyle.Secondary,
 	success: ButtonStyle.Success,
 } as const;
-
-/**
- * One Discord message of a {@link Reply}: at most {@link MAX_COMPONENTS} components holding at most
- * {@link MAX_TEXT_LENGTH} characters of text and {@link MAX_FILES} images of {@link MAX_IMAGE_BYTES} together.
- */
-export type Message = {
-	/**
-	 * What to show, in order.
-	 */
-	components: Component[];
-};
 
 /**
  * The slash commands, for servers and for Players who install the bot themselves.
@@ -119,29 +103,28 @@ async function handle(interaction: ChatInputCommandInteraction | ButtonInteracti
 		playerId,
 		serverId: interaction.guildId,
 	});
-	let reply: Reply;
+	let message: ReturnType<typeof toDiscord>;
 	try {
 		// Acknowledge before the Game commits anything, so a missed response
 		// window can't leave a committed command whose reply never arrives.
 		if (interaction.isButton()) await interaction.deferUpdate();
 		else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 		const input = interaction.isButton() ? { button: interaction.customId } : toInput(commandName(interaction));
-		({ reply } = game.handle(playerId, interaction.guildId, input, new Date()));
+		message = toDiscord(game.handle(playerId, interaction.guildId, input, new Date()).reply);
 	} catch (error) {
 		log.error('Command failed', error);
 		if (!interaction.deferred) return;
+		const failed = toDiscord({ components: [{ content: 'Something went wrong. Try again.', type: 'textDisplay' }] });
 		await interaction
-			.editReply({ content: 'Something went wrong. Try again.' })
+			.editReply({ ...failed, attachments: [] })
 			.catch((replyError) => log.error('Could not send the error reply', replyError));
 		return;
 	}
 
 	// The command has committed, so a failed reply must not invite a retry.
 	try {
-		const [first, ...rest] = toMessages(reply).map(toDiscord);
 		// A button press replaces its message, so clear the attachments it had.
-		await interaction.editReply({ ...first, attachments: [] });
-		for (const message of rest) await interaction.followUp({ ...message, flags: MessageFlags.Ephemeral });
+		await interaction.editReply({ ...message, attachments: [] });
 		log.info('Command handled');
 	} catch (error) {
 		log.error('Command handled, but the reply could not be sent', error);
@@ -170,66 +153,22 @@ function toInput(command: string): Input {
 }
 
 /**
- * Splits a {@link Reply} into as few Discord messages as hold its parts, in order.
- *
- * @remarks
- * A text too long for one message is split at a line break, or else between graphemes, into texts
- * of their own. Any other part whose texts are too long has its longest text cut short: to the room
- * left in the message before it, so it stays with what came before, or else to fit a message of its own.
+ * Each of Discord's limits on one message that `reply` breaks, described for an author or a log.
  */
-export function toMessages(reply: Reply): Message[] {
-	const messages: Message[] = [];
-	for (const part of reply.components.flatMap(splitLongText)) {
-		const last = messages.at(-1);
-		// A part that must be cut anyway is cut to the room left, so it stays with what came before.
-		const mustCut = textLength([part]) > MAX_TEXT_LENGTH;
-		const room = last === undefined ? 0 : MAX_TEXT_LENGTH - textLength(last.components);
-		const shown = mustCut ? cut(part, room, 1) : part;
-		if (last !== undefined && shown !== undefined && fits([...last.components, shown])) {
-			last.components.push(shown);
-		} else {
-			messages.push({ components: [cut(part, MAX_TEXT_LENGTH, Infinity) ?? part] });
-		}
-	}
-	return messages;
-}
-
-/**
- * `part` as texts that each fit in a message on their own, when it's a text, or else `part` itself.
- */
-function splitLongText(part: Component): Component[] {
-	if (part.type !== 'textDisplay') return [part];
-	return splitText(part.content).map((content) => ({ content, type: 'textDisplay' }));
-}
-
-/**
- * `part` with up to `texts` of its texts cut short, longest first, each with an ellipsis, until they hold
- * at most `max` characters together, or `undefined` when they can't.
- * A text on its own is never cut, since {@link splitLongText} splits it instead.
- */
-function cut(part: Component, max: number, texts: number): Component | undefined {
-	let fitted = part;
-	for (let cuts = 0; textLength([fitted]) > max; cuts++) {
-		const longest = textsIn([fitted]).reduce((a, b) => (b.content.length > a.content.length ? b : a));
-		if (cuts === texts || longest.content.length <= 1) return undefined;
-		const room = longest.content.length - (textLength([fitted]) - max);
-		fitted = withText(fitted, longest, clip(longest.content, Math.max(room, 1)));
-	}
-	return fitted;
-}
-
-/**
- * Whether `parts` fit in one message.
- */
-function fits(parts: Component[]): boolean {
-	const images = imagesIn(parts);
+export function brokenLimits({ components }: Reply): string[] {
+	const images = imagesIn(components);
 	const bytes = images.reduce((total, image) => total + image.data.length, 0);
-	return (
-		textLength(parts) <= MAX_TEXT_LENGTH &&
-		count(parts) <= MAX_COMPONENTS &&
-		images.length <= MAX_FILES &&
-		bytes <= MAX_IMAGE_BYTES
-	);
+	const n = (count: number) => count.toLocaleString('en-US');
+	return [
+		textLength(components) > MAX_TEXT_LENGTH &&
+			`${n(textLength(components))} characters of text, more than the ${n(MAX_TEXT_LENGTH)} Discord shows in one message`,
+		count(components) > MAX_COMPONENTS &&
+			`${n(count(components))} components, more than the ${n(MAX_COMPONENTS)} Discord shows in one message`,
+		images.length > MAX_FILES &&
+			`${n(images.length)} images, more than the ${n(MAX_FILES)} Discord attaches to one message`,
+		bytes > MAX_IMAGE_BYTES &&
+			`images of ${n(bytes)} bytes together, more than the ${n(MAX_IMAGE_BYTES)} Discord attaches to one message`,
+	].filter((problem) => problem !== false);
 }
 
 /**
@@ -283,60 +222,14 @@ function imagesIn(parts: Component[]): Image[] {
 }
 
 /**
- * `part`, with `old` in it replaced by a text of `content`.
+ * Builds a {@link Reply} as one Discord message in Components V2, attaching each image it shows once.
+ *
+ * @throws When it breaks one of Discord's limits on a message, which startup checks every Quest's screens against.
  */
-function withText<T extends Component>(part: T, old: TextDisplay, content: string): T {
-	const replace = (inner: Component): Component => {
-		if (inner === old) return { content, type: 'textDisplay' };
-		if (inner.type === 'container') return { ...inner, components: inner.components.map(replace) } as Component;
-		if (inner.type === 'section') return { ...inner, components: inner.components.map(replace) } as Component;
-		return inner;
-	};
-	return replace(part) as T;
-}
-
-/**
- * Splits `text` into pieces of at most {@link MAX_TEXT_LENGTH} characters, at the last line break that fits,
- * or else at the last grapheme that fits, so an emoji such as a flag is never cut in two.
- */
-function splitText(text: string): string[] {
-	const pieces: string[] = [];
-	let rest = text;
-	while (rest.length > MAX_TEXT_LENGTH) {
-		const lineBreak = rest.lastIndexOf('\n', MAX_TEXT_LENGTH);
-		const end = lineBreak > 0 ? lineBreak : lastGraphemeBreak(rest);
-		pieces.push(rest.slice(0, end));
-		rest = rest.slice(lineBreak > 0 ? end + 1 : end);
-	}
-	pieces.push(rest);
-	// Discord refuses a text of only whitespace, such as what a trailing line break leaves.
-	return pieces.filter((piece) => piece.trim() !== '');
-}
-
-/**
- * Where the last grapheme that fits in `max` characters of `text` ends.
- */
-function lastGraphemeBreak(text: string, max = MAX_TEXT_LENGTH): number {
-	let end = 0;
-	for (const { index } of GRAPHEMES.segment(text)) {
-		if (index > max) break;
-		end = index;
-	}
-	// A single grapheme longer than the limit can only be cut.
-	return end > 0 ? end : max;
-}
-
-/**
- * `text`, cut to at most `max` characters between graphemes, ending in an ellipsis when it was cut.
- */
-function clip(text: string, max: number): string {
-	return text.length <= max ? text : `${text.slice(0, lastGraphemeBreak(text, max - 1))}…`;
-}
-
-/**
- * Builds a {@link Message} as Discord's Components V2, attaching each image it shows once.
- */
-export function toDiscord({ components }: Message) {
+export function toDiscord(reply: Reply) {
+	const problems = brokenLimits(reply);
+	if (problems.length > 0) throw new Error(`Reply breaks Discord's limits: ${problems.join('; ')}`);
+	const { components } = reply;
 	const names = attachmentNames(imagesIn(components));
 	const url = (image: Image): APIUnfurledMediaItem => ({ url: `attachment://${names.get(image)}` });
 	const media = ({ description, media, spoiler }: Media) => ({

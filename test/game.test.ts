@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Button, Component } from '../src/components.ts';
-import { createGame, type Game, type Reply } from '../src/game.ts';
+import { createGame, everyScreen, type Game, type Reply } from '../src/game.ts';
 import { loadQuests, MAX_ID_LENGTH, type Image, type Quest } from '../src/registry.ts';
 import { openStorage } from '../src/storage.ts';
 
@@ -305,4 +305,26 @@ test('a button for a Quest that does not exist is an error', () => {
 		() => game.handle('player-1', 'server-1', { button: 'quest:nowhere' }, NOW),
 		/Unknown button: quest:nowhere/,
 	);
+});
+
+test('every screen of every Quest and Character is listed with the file that declared it, as Players see it', () => {
+	const game = newGame();
+	const fixtures = fileURLToPath(new URL('fixtures/quests/', import.meta.url));
+
+	const screens = everyScreen(QUESTS);
+
+	assert.deepEqual(
+		screens.map(({ file }) => relative(fixtures, file)),
+		[
+			'pilgrimage/quest.ts',
+			'pilgrimage/characters/pilgrim.ts',
+			'clockwork-tower/quest.ts',
+			'clockwork-tower/characters/warden.ts',
+			'clockwork-tower/characters/tinker.ts',
+		],
+	);
+	const { reply: amberRoad } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
+	assert.deepEqual(screens[0]?.reply, amberRoad);
+	assert.deepEqual(screens[2]?.reply, press(game, amberRoad, 'Next'));
+	assert.deepEqual(screens[4]?.reply, press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next'));
 });

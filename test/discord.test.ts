@@ -2,11 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MessageFlags } from 'discord.js';
 import type { ActionRow, Component, MediaGallery, TextDisplay } from '../src/components.ts';
-import { toDiscord, toMessages, type Message } from '../src/discord.ts';
-import { fileURLToPath } from 'node:url';
-import { createGame } from '../src/game.ts';
-import { loadQuests, type Image } from '../src/registry.ts';
-import { openStorage } from '../src/storage.ts';
+import { brokenLimits, toDiscord } from '../src/discord.ts';
+import type { Image } from '../src/registry.ts';
 
 /**
  * An image named `name`, of `bytes` bytes.
@@ -41,239 +38,73 @@ function gallery(...images: Image[]): MediaGallery {
 	return { items: images.map((media) => ({ media })), type: 'mediaGallery' };
 }
 
-/**
- * The text of each top-level text in each message.
- */
-function textsOf(messages: Message[]): string[][] {
-	return messages.map((message) => message.components.map((part) => (part.type === 'textDisplay' ? part.content : '')));
-}
+test('a reply of exactly 4000 characters of text, counting texts inside boxes and sections, is within limits, and 4001 is not', () => {
+	const section: Component = {
+		accessory: row(1).components[0]!,
+		components: [text('b'.repeat(1000))],
+		type: 'section',
+	};
+	const box = (length: number): Component => ({ components: [text('a'.repeat(length)), section], type: 'container' });
 
-test('a reply that fits in one message is one message, with its parts as the Game laid them out', () => {
-	const components: Component[] = [
-		text('Choose a Quest.'),
-		{ components: [gallery(image('tower.png')), text('## Tower\nClimb.')], type: 'container' },
-		row(3),
-	];
-
-	assert.deepEqual(toMessages({ components }), [{ components }]);
+	assert.deepEqual(brokenLimits({ components: [text('x'.repeat(1000)), box(2000)] }), []);
+	assert.deepEqual(brokenLimits({ components: [text('x'.repeat(1000)), box(2001)] }), [
+		'4,001 characters of text, more than the 4,000 Discord shows in one message',
+	]);
 });
 
-test('texts that together pass 4000 characters start a new message', () => {
-	const messages = toMessages({ components: [text('x'.repeat(1500)), text('y'.repeat(1500)), text('z'.repeat(1500))] });
-
-	assert.deepEqual(textsOf(messages), [['x'.repeat(1500), 'y'.repeat(1500)], ['z'.repeat(1500)]]);
-});
-
-test('texts of exactly 4000 characters together stay in one message, and 4001 go in two', () => {
-	const exactly = toMessages({ components: [text('x'.repeat(2000)), text('y'.repeat(2000))] });
-	const over = toMessages({ components: [text('x'.repeat(2000)), text('y'.repeat(2001))] });
-
-	assert.equal(exactly.length, 1);
-	assert.equal(over.length, 2);
-});
-
-test('a text over 4000 characters is split at its last line break that fits, or else at 4000', () => {
-	const lines = ['a'.repeat(2400), 'b'.repeat(2400), 'c'.repeat(5000)].join('\n');
-
-	const messages = toMessages({ components: [text(lines)] });
-
-	assert.deepEqual(textsOf(messages), [['a'.repeat(2400)], ['b'.repeat(2400)], ['c'.repeat(4000)], ['c'.repeat(1000)]]);
-});
-
-test('a text split at 4000 characters keeps each emoji whole', () => {
-	const messages = toMessages({ components: [text(`a${'🐉'.repeat(3000)}`)] });
-
-	assert.deepEqual(textsOf(messages), [[`a${'🐉'.repeat(1999)}`], ['🐉'.repeat(1001)]]);
-});
-
-test('a text split at 4000 characters keeps emoji made of several characters whole, such as flags', () => {
-	const messages = toMessages({ components: [text(`a${'🇫🇷'.repeat(1200)}`)] });
-
-	assert.deepEqual(textsOf(messages), [[`a${'🇫🇷'.repeat(999)}`], ['🇫🇷'.repeat(201)]]);
-});
-
-test('a single character longer than a message is cut at 4000', () => {
-	// One letter with 5000 accents is one character as a reader sees it.
-	const messages = toMessages({ components: [text(`e${'́'.repeat(5000)}`)] });
-
-	assert.deepEqual(
-		textsOf(messages).map(([content]) => content?.length),
-		[4000, 1001],
-	);
-});
-
-test('a split that leaves only blank text sends no empty text', () => {
-	const messages = toMessages({ components: [text(`${'x'.repeat(4000)}\n\n`)] });
-
-	assert.deepEqual(textsOf(messages), [['x'.repeat(4000)]]);
-});
-
-test('parts of exactly 40 components, counting what each section holds, stay in one message, and 41 go in two', () => {
+test('a reply of exactly 40 components, counting each part inside another and each button, is within limits, and 41 is not', () => {
 	// Each section is three components: itself, its text, and its button.
 	const section: Component = { accessory: row(1).components[0]!, components: [text('x')], type: 'section' };
-	const sections = Array.from({ length: 13 }, () => section);
-	const separator: Component = { type: 'separator' };
+	// Each row of five buttons is six components.
+	const parts: Component[] = [
+		...Array.from({ length: 8 }, () => section),
+		...Array.from({ length: 2 }, () => row(5)),
+		{ type: 'separator' },
+		{ type: 'separator' },
+		{ type: 'separator' },
+		{ type: 'separator' },
+	];
 
-	const exactly = toMessages({ components: [...sections, separator] });
-	const over = toMessages({ components: [...sections, separator, separator] });
-
-	assert.equal(exactly.length, 1);
-	assert.deepEqual(
-		over.map((message) => message.components.length),
-		[14, 1],
-	);
+	assert.deepEqual(brokenLimits({ components: parts }), []);
+	assert.deepEqual(brokenLimits({ components: [...parts, { type: 'separator' }] }), [
+		'41 components, more than the 40 Discord shows in one message',
+	]);
 });
 
-test('parts that together attach more than 10 images, in galleries, thumbnails, or files, start a new message', () => {
-	const components: Component[] = [
-		...Array.from({ length: 9 }, (_, i) => gallery(image(`${i + 1}.png`))),
-		{
-			accessory: { media: image('face.png'), type: 'thumbnail' },
-			components: [text('Tinker')],
-			type: 'section',
-		},
+test('a reply of 10 images, in galleries, thumbnails, or files, is within limits, and 11 is not', () => {
+	const parts: Component[] = [
+		...Array.from({ length: 8 }, (_, i) => gallery(image(`${i + 1}.png`))),
+		{ accessory: { media: image('face.png'), type: 'thumbnail' }, components: [text('Tinker')], type: 'section' },
 		{ file: image('notes.png'), type: 'file' },
 	];
 
-	const messages = toMessages({ components });
-
-	assert.deepEqual(
-		messages.map((message) => message.components.length),
-		[10, 1],
-	);
+	assert.deepEqual(brokenLimits({ components: parts }), []);
+	assert.deepEqual(brokenLimits({ components: [...parts, gallery(image('11.png'))] }), [
+		'11 images, more than the 10 Discord attaches to one message',
+	]);
 });
 
 test('the same image shown twice is attached once, so it counts once', () => {
 	const map = image('map.png');
-	const components = Array.from({ length: 11 }, () => gallery(map));
 
-	assert.equal(toMessages({ components }).length, 1);
+	assert.deepEqual(brokenLimits({ components: Array.from({ length: 11 }, () => gallery(map)) }), []);
 });
 
-test('images that together pass 8 MiB start a new message', () => {
+test('a reply whose images pass 8 MiB together is not within limits', () => {
 	const fourMiB = 4 * 1024 * 1024;
-	const components = [gallery(image('a.png', fourMiB)), gallery(image('b.png', fourMiB)), gallery(image('c.png'))];
+	const parts = [gallery(image('a.png', fourMiB)), gallery(image('b.png', fourMiB))];
 
-	const messages = toMessages({ components });
+	assert.deepEqual(brokenLimits({ components: parts }), []);
+	assert.deepEqual(brokenLimits({ components: [...parts, gallery(image('c.png'))] }), [
+		'images of 8,388,609 bytes together, more than the 8,388,608 Discord attaches to one message',
+	]);
+});
 
-	assert.deepEqual(
-		messages.map((message) => message.components.length),
-		[2, 1],
+test('a reply that breaks a limit is not sent', () => {
+	assert.throws(
+		() => toDiscord({ components: [text('x'.repeat(4001))] }),
+		/Reply breaks Discord's limits: 4,001 characters of text, more than the 4,000 Discord shows in one message/,
 	);
-});
-
-test('a box whose texts pass 4000 characters on their own has its longest text cut, with an ellipsis, to fit', () => {
-	const box: Component = {
-		components: [
-			text('## Tower'),
-			{ accessory: row(1).components[0]!, components: [text('d'.repeat(5000))], type: 'section' },
-		],
-		type: 'container',
-	};
-
-	const [message, ...rest] = toMessages({ components: [box] });
-
-	assert.deepEqual(rest, []);
-	assert.deepEqual(message, {
-		components: [
-			{
-				components: [
-					text('## Tower'),
-					{ accessory: row(1).components[0], components: [text(`${'d'.repeat(3991)}…`)], type: 'section' },
-				],
-				type: 'container',
-			},
-		],
-	});
-});
-
-test('a box too long for a message is cut to the room the texts before it leave, so it stays with them and its buttons', () => {
-	const box: Component = { components: [text('## Tower'), text('d'.repeat(5000))], type: 'container' };
-
-	const messages = toMessages({ components: [text('Choose a Quest.'), box, row(3)] });
-
-	assert.deepEqual(messages, [
-		{
-			components: [
-				text('Choose a Quest.'),
-				{ components: [text('## Tower'), text(`${'d'.repeat(3976)}…`)], type: 'container' },
-				row(3),
-			],
-		},
-	]);
-});
-
-test('a box that fits in a message of its own goes there whole, rather than cut to the room left', () => {
-	const box: Component = { components: [text('d'.repeat(3000))], type: 'container' };
-
-	const messages = toMessages({ components: [text('x'.repeat(2000)), box] });
-
-	assert.deepEqual(messages, [{ components: [text('x'.repeat(2000))] }, { components: [box] }]);
-});
-
-test('a box that cannot be cut to the room left starts a new message, cut to fit it', () => {
-	const box: Component = { components: [text('## The Clockwork Tower'), text('d'.repeat(5000))], type: 'container' };
-
-	const messages = toMessages({ components: [text('x'.repeat(3990)), box] });
-
-	assert.deepEqual(messages, [
-		{ components: [text('x'.repeat(3990))] },
-		{ components: [{ components: [text('## The Clockwork Tower'), text(`${'d'.repeat(3977)}…`)], type: 'container' }] },
-	]);
-});
-
-test('a box still too long with its longest text cut short has its next longest cut too', () => {
-	const box: Component = {
-		components: [text('a'.repeat(2500)), text('b'.repeat(2500)), text('c'.repeat(2500))],
-		type: 'container',
-	};
-
-	const [message, ...rest] = toMessages({ components: [box] });
-
-	assert.deepEqual(rest, []);
-	assert.deepEqual(message?.components, [
-		{ components: [text('…'), text(`${'b'.repeat(1498)}…`), text('c'.repeat(2500))], type: 'container' },
-	]);
-});
-
-test('a box whose texts are too many to cut short enough is left whole, rather than cut forever', () => {
-	const box: Component = { components: Array.from({ length: 4001 }, () => text('x')), type: 'container' };
-
-	assert.deepEqual(toMessages({ components: [box] }), [{ components: [box] }]);
-});
-
-test('a cut text is cut between graphemes, so an emoji at the limit is left out whole', () => {
-	const box: Component = { components: [text(`${'x'.repeat(3997)}🇯🇵yy`)], type: 'container' };
-
-	const [message] = toMessages({ components: [box] });
-
-	assert.deepEqual(message?.components, [{ components: [text(`${'x'.repeat(3997)}…`)], type: 'container' }]);
-});
-
-test('a Quest and Characters with texts too long for Discord each show in one message, with the longest text cut', async () => {
-	const quests = await loadQuests([fileURLToPath(new URL('fixtures/long-quests/', import.meta.url))]);
-	const game = createGame({ quests, storage: openStorage(':memory:') });
-	const press = (button: string) => game.handle('player-1', null, { button }, new Date()).reply;
-	const replies = [
-		game.handle('player-1', null, { command: 'quest start' }, new Date()).reply,
-		press('quest:endless-library'),
-		press('next:characters:endless-library:1'),
-	];
-
-	const cutTexts = replies.map((reply) => {
-		const messages = toMessages(reply);
-		assert.equal(messages.length, 1);
-		const box = messages[0]!.components[1]!;
-		assert.equal(box.type, 'container');
-		return box.type === 'container'
-			? box.components.flatMap((part) =>
-					part.type === 'textDisplay' && part.content.endsWith('…') ? [part.content.split('\n')[0]] : [],
-				)
-			: [];
-	});
-
-	// The cut text in each: the Quest's description, the Archivist's Abilities, and the Reader's description.
-	assert.deepEqual(cutTexts, [['## The Endless Library'], ['**Abilities**'], ['## The Reader']]);
 });
 
 /**
