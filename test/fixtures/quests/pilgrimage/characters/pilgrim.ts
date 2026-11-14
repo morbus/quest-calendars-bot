@@ -2,6 +2,7 @@ import { character } from '../../../../../src/builder.ts';
 
 export default character({
 	abilities: [],
+	description: 'Walks the road for reasons of their own.',
 	id: 'pilgrim',
 	name: 'Pilgrim',
 	stats: { attack: 0, damage: 'd4', defense: 1, maxHealth: 8 },

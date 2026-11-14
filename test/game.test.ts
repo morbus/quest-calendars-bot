@@ -27,15 +27,19 @@ test('/quest start says Quests are coming soon when there are none', () => {
 
 	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
 
-	assert.deepEqual(reply.sections, ['Quests are coming soon.']);
+	assert.deepEqual(reply.sections, [{ text: 'Quests are coming soon.' }]);
 });
 
-test('/quest start lists each Quest as a button, by name', () => {
+test('/quest start describes each Quest and offers it as a button, by name', () => {
 	const game = newGame();
 
 	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
 
-	assert.deepEqual(reply.sections, ['Choose a Quest.']);
+	assert.deepEqual(reply.sections, [
+		{ text: 'Choose a Quest.' },
+		{ text: 'The Amber Road\nA pilgrimage along the old trade road.' },
+		{ text: 'The Clockwork Tower\nClimb a tower of gears before it strikes midnight.' },
+	]);
 	assert.deepEqual(
 		reply.buttons?.map((button) => button.label),
 		['The Amber Road', 'The Clockwork Tower'],
@@ -52,28 +56,34 @@ function chooseQuest(game: Game, label: string): Reply {
 	return game.handle('player-1', 'server-1', { button: button.id }, NOW).reply;
 }
 
-test('choosing a Quest lists its Characters, by name, with their Stats, Traits, and Abilities', () => {
+test('choosing a Quest lists its Characters, by name, with their descriptions, Stats, Traits, and Abilities', () => {
 	const game = newGame();
 
 	const reply = chooseQuest(game, 'The Clockwork Tower');
 
 	assert.deepEqual(reply.sections, [
-		'Characters in The Clockwork Tower:',
-		[
-			'Iron Warden',
-			'Stats: Max Health 14, Defense +4, Attack +3, Damage 2d4',
-			'Traits: Strength +3, Dexterity +0, Constitution +2, Intellect -1, Wisdom +0, Charisma +1',
-			'Abilities:',
-			'- Bulwark: Twice per Page: add +2 to a Defense roll.',
-		].join('\n'),
-		[
-			'Tinker',
-			'Stats: Max Health 10, Defense +2, Attack +1, Damage d6',
-			'Traits: Strength -1, Dexterity +2, Constitution +0, Intellect +3, Wisdom +1, Charisma +0',
-			'Abilities:',
-			'- Gadgeteer: Once per Rest: add d4 to an Intellect roll.',
-			'- Spare Parts: Add +1 to rolls to repair.',
-		].join('\n'),
+		{ text: 'Characters in The Clockwork Tower:' },
+		{
+			text: [
+				'Iron Warden',
+				'A guard who has never left her post.',
+				'Stats: Max Health 14, Defense +4, Attack +3, Damage 2d4',
+				'Traits: Strength +3, Dexterity +0, Constitution +2, Intellect -1, Wisdom +0, Charisma +1',
+				'Abilities:',
+				'- Bulwark: Twice per Page: add +2 to a Defense roll.',
+			].join('\n'),
+		},
+		{
+			text: [
+				'Tinker',
+				'Builds what the tower breaks.',
+				'Stats: Max Health 10, Defense +2, Attack +1, Damage d6',
+				'Traits: Strength -1, Dexterity +2, Constitution +0, Intellect +3, Wisdom +1, Charisma +0',
+				'Abilities:',
+				'- Gadgeteer: Once per Rest: add d4 to an Intellect roll.',
+				'- Spare Parts: Add +1 to rolls to repair.',
+			].join('\n'),
+		},
 	]);
 });
 
@@ -83,13 +93,16 @@ test('a Character with no Abilities says so', () => {
 	const reply = chooseQuest(game, 'The Amber Road');
 
 	assert.deepEqual(reply.sections, [
-		'Characters in The Amber Road:',
-		[
-			'Pilgrim',
-			'Stats: Max Health 8, Defense +1, Attack +0, Damage d4',
-			'Traits: Strength +0, Dexterity +0, Constitution +1, Intellect +0, Wisdom +2, Charisma +1',
-			'Abilities: none',
-		].join('\n'),
+		{ text: 'Characters in The Amber Road:' },
+		{
+			text: [
+				'Pilgrim',
+				'Walks the road for reasons of their own.',
+				'Stats: Max Health 8, Defense +1, Attack +0, Damage d4',
+				'Traits: Strength +0, Dexterity +0, Constitution +1, Intellect +0, Wisdom +2, Charisma +1',
+				'Abilities: none',
+			].join('\n'),
+		},
 	]);
 });
 

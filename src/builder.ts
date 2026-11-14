@@ -29,6 +29,10 @@ export type QuestMetadata = {
 	 */
 	currency: string;
 	/**
+	 * What the Quest is about, as Players read it before choosing it.
+	 */
+	description: string;
+	/**
 	 * Identifies the Quest for as long as it exists: lowercase letters, digits, and hyphens.
 	 */
 	id: string;
@@ -100,6 +104,10 @@ export type Character = {
 	 * The Character's starting Abilities, in the order Players see them.
 	 */
 	abilities: Ability[];
+	/**
+	 * Who the Character is, as Players read it before choosing them.
+	 */
+	description: string;
 	/**
 	 * Identifies the Character within its Quest: lowercase letters, digits, and hyphens.
 	 */

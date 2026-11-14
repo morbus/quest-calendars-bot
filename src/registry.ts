@@ -141,6 +141,7 @@ function checkMetadata(value: unknown): QuestMetadata {
 	const metadata = value as QuestMetadata;
 	checkId(metadata.id);
 	checkName(metadata.name);
+	checkText('description', metadata.description);
 	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
 	checkText('currency', metadata.currency);
 	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
@@ -169,6 +170,7 @@ function checkCharacter(value: unknown): Character {
 	const character = value as Character;
 	checkId(character.id);
 	checkName(character.name);
+	checkText('description', character.description);
 	checkObject('stats', character.stats);
 	const { attack, damage, defense, maxHealth } = character.stats;
 	if (typeof damage !== 'string' || !DICE.test(damage)) fail('stats.damage', 'dice, such as d6 or 2d4', damage);

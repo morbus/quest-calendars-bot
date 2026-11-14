@@ -136,5 +136,5 @@ function render(reply: Reply): InteractionEditReplyOptions {
 	for (let i = 0; i < buttons.length; i += BUTTONS_PER_ROW) {
 		components.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + BUTTONS_PER_ROW)));
 	}
-	return { content: reply.sections.join('\n\n'), components };
+	return { content: reply.sections.map((section) => section.text).join('\n\n'), components };
 }

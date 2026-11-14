@@ -18,6 +18,7 @@ const BUILDER = pathToFileURL(fileURLToPath(new URL('../src/builder.ts', import.
 const METADATA: QuestMetadata = {
 	complete: false,
 	currency: 'gold',
+	description: 'A pilgrimage along the old trade road.',
 	id: 'amber-road',
 	name: 'The Amber Road',
 	ruleModules: [],
@@ -28,6 +29,7 @@ const METADATA: QuestMetadata = {
  */
 const CHARACTER: Character = {
 	abilities: [{ name: 'Devout', text: 'Add +1 to Wisdom rolls.' }],
+	description: 'Walks the road for reasons of their own.',
 	id: 'pilgrim',
 	name: 'Pilgrim',
 	stats: { attack: 0, damage: 'd4', defense: 1, maxHealth: 8 },
@@ -280,6 +282,16 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 		name: 'an Ability with no text',
 		quest: { characters: [{ ...CHARACTER, abilities: [{ name: 'Devout' }] }] },
 		error: /character-1\.ts: abilities\[0\]\.text must be text, not undefined/,
+	},
+	{
+		name: 'a Quest with no description',
+		quest: { metadata: { ...METADATA, description: undefined } },
+		error: /quest\.ts: description must be text, not undefined/,
+	},
+	{
+		name: 'a Character with no description',
+		quest: { characters: [{ ...CHARACTER, description: ' ' }] },
+		error: /character-1\.ts: description must be text, not " "/,
 	},
 	{
 		name: 'a Rule Module turned on twice',

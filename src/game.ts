@@ -23,9 +23,19 @@ export type Reply = {
 	 */
 	buttons?: Button[];
 	/**
-	 * What to show, in order, as paragraphs of text.
+	 * What to show, in order.
 	 */
-	sections: string[];
+	sections: Section[];
+};
+
+/**
+ * One paragraph of a {@link Reply}.
+ */
+export type Section = {
+	/**
+	 * What the paragraph says.
+	 */
+	text: string;
 };
 
 /**
@@ -90,9 +100,12 @@ export function createGame({ quests, storage }: { quests: Quest[]; storage: Stor
  * Offers each Quest as a button, or says none are ready yet.
  */
 function listQuests(quests: Quest[]): Reply {
-	if (quests.length === 0) return { sections: ['Quests are coming soon.'] };
+	if (quests.length === 0) return { sections: [{ text: 'Quests are coming soon.' }] };
 	return {
-		sections: ['Choose a Quest.'],
+		sections: [
+			{ text: 'Choose a Quest.' },
+			...quests.map((quest) => ({ text: `${quest.name}\n${quest.description}` })),
+		],
 		buttons: quests.map((quest) => ({ id: questButtonId(quest), label: quest.name })),
 	};
 }
@@ -108,15 +121,21 @@ function questButtonId(quest: Quest): string {
  * Shows each of a Quest's Characters with their Stats, Traits, and Abilities.
  */
 function listCharacters(quest: Quest): Reply {
-	return { sections: [`Characters in ${quest.name}:`, ...quest.characters.map(describeCharacter)] };
+	return {
+		sections: [
+			{ text: `Characters in ${quest.name}:` },
+			...quest.characters.map((character) => ({ text: describeCharacter(character) })),
+		],
+	};
 }
 
 /**
- * A Character's name, then a line each for their Stats, Traits, and Abilities.
+ * A Character's name and description, then a line each for their Stats, Traits, and Abilities.
  */
-function describeCharacter({ abilities, name, stats, traits }: Character): string {
+function describeCharacter({ abilities, description, name, stats, traits }: Character): string {
 	return [
 		name,
+		description,
 		`Stats: Max Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`,
 		`Traits: ${TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ')}`,
 		abilities.length === 0 ? 'Abilities: none' : 'Abilities:',
