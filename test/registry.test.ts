@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtempDisposable, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtempDisposable, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -477,6 +477,15 @@ test('an image of 8 MiB loads', async () => {
 
 test('an image over 8 MiB, more than Discord takes in a message, fails to load', async () => {
 	await assert.rejects(loadWithImage(8 * 1024 * 1024 + 1), /quest\.ts: image must be at most 8 MiB, not "map\.png"/);
+});
+
+test('an image too large to read, such as one over 2 GiB, fails to load with the 8 MiB rule', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await writeQuestWithImage(dir.path, 0);
+	// A sparse file, so the test writes no 3 GiB to disk.
+	await truncate(join(dir.path, 'quest-1', 'map.png'), 3 * 1024 * 1024 * 1024);
+
+	await assert.rejects(loadQuests([dir.path]), /quest\.ts: image must be at most 8 MiB, not "map\.png"/);
 });
 
 test('an image moved after startup still shows, since it was read at startup', async () => {
