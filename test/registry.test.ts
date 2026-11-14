@@ -210,9 +210,9 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 		error: /quest\.ts: id must be letters a–z and digits 0–9, with single hyphens between them, not undefined/,
 	},
 	{
-		name: 'a Quest id over 64 characters',
-		quest: { metadata: { ...METADATA, id: 'a'.repeat(65) } },
-		error: /quest\.ts: id must be at most 64 characters/,
+		name: 'a Quest id over 44 characters',
+		quest: { metadata: { ...METADATA, id: 'a'.repeat(45) } },
+		error: /quest\.ts: id must be at most 44 characters/,
 	},
 	{
 		name: 'a Quest with no name',
@@ -384,12 +384,12 @@ test('hidden directories, such as .git, are not Quests', async () => {
 	assert.deepEqual(await loadQuests([dir.path]), []);
 });
 
-test('names of 80 characters and ids of 64 load', async () => {
+test('names of 80 characters and ids of 44 load', async () => {
 	await assert.doesNotReject(
 		load([
 			{
-				characters: [{ ...CHARACTER, id: 'p'.repeat(64), name: 'P'.repeat(80) }],
-				metadata: { ...METADATA, id: 'a'.repeat(64), name: 'A'.repeat(80) },
+				characters: [{ ...CHARACTER, id: 'p'.repeat(44), name: 'P'.repeat(80) }],
+				metadata: { ...METADATA, id: 'a'.repeat(44), name: 'A'.repeat(80) },
 			},
 		]),
 	);
@@ -472,12 +472,8 @@ function questsNumbered(count: number): QuestFiles[] {
 	}));
 }
 
-test('25 Quests load, as many as /quest start can show as buttons', async () => {
-	await assert.doesNotReject(load(questsNumbered(25)));
-});
-
-test('more than 25 Quests fail to load', async () => {
-	await assert.rejects(load(questsNumbered(26)), /26 Quests are more than the 25 \/quest start can show/);
+test('more than 25 Quests load, since /quest start shows them one at a time', async () => {
+	await assert.doesNotReject(load(questsNumbered(26)));
 });
 
 /**

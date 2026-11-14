@@ -196,6 +196,51 @@ test('choosing a Character says starting a Quest is coming soon', () => {
 	assert.deepEqual(reply, { sections: [{ text: 'Starting a Quest is coming soon.' }] });
 });
 
+/**
+ * The fixture Quests, with The Clockwork Tower's Characters narrowed to those `keep` accepts.
+ */
+function towerKeeping(keep: (name: string) => boolean): Quest[] {
+	return QUESTS.map((quest) =>
+		quest.id === 'clockwork-tower'
+			? { ...quest, characters: quest.characters.filter((character) => keep(character.name)) }
+			: quest,
+	);
+}
+
+test('an old Choose this Character button still chooses the same Character after the Characters change', () => {
+	const before = newGame();
+	const tinker = press(before, chooseQuest(before, 'The Clockwork Tower'), 'Next');
+	const choose = tinker.buttons?.find((button) => button.label === 'Choose this Character')?.id ?? '';
+
+	const after = newGame(towerKeeping((name) => name === 'Tinker'));
+	const gone = newGame(towerKeeping((name) => name !== 'Tinker'));
+
+	assert.deepEqual(after.handle('player-1', 'server-1', { button: choose }, NOW).reply, {
+		sections: [{ text: 'Starting a Quest is coming soon.' }],
+	});
+	assert.throws(() => gone.handle('player-1', 'server-1', { button: choose }, NOW), /Unknown button/);
+});
+
+test("every button id fits in Discord's 100 characters when Quest and Character ids are as long as they can be", () => {
+	const quest = QUESTS.find((quest) => quest.id === 'clockwork-tower')!;
+	const long = {
+		...quest,
+		characters: quest.characters.map((character, i) => ({ ...character, id: `${i}`.repeat(44) })),
+		id: 'q'.repeat(44),
+	};
+	const game = newGame([long]);
+
+	const characters = press(
+		game,
+		game.handle('player-1', 'server-1', { command: 'quest start' }, NOW).reply,
+		'Choose this Quest',
+	);
+
+	const ids = characters.buttons?.map((button) => button.id) ?? [];
+	assert.equal(ids.length, 3);
+	for (const id of ids) assert.ok(id.length <= 100, `${id} is ${id.length} characters`);
+});
+
 test('a button for a Quest or Character that does not exist is an error', () => {
 	const game = newGame();
 
@@ -203,7 +248,7 @@ test('a button for a Quest or Character that does not exist is an error', () => 
 		'next:quests:2',
 		'next:characters:amber-road:1',
 		'next:characters:nowhere:0',
-		'character:amber-road:1',
+		'character:amber-road:nobody',
 		'next:quests:',
 		'quest:amber-road:extra',
 	]) {

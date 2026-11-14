@@ -40,7 +40,7 @@ export default quest({
 - `complete`: `true` once you've finished writing the Quest.
 - `currency`: what the Quest's Currency is called, such as "gold" or "scrap".
 - `description`: what Players read before they choose the Quest.
-- `id`: letters a–z and digits 0–9, with single hyphens between them, such as `clockwork-tower`, at most 64 characters. Keep it once Players have played the Quest.
+- `id`: letters a–z and digits 0–9, with single hyphens between them, such as `clockwork-tower`, at most 44 characters. Keep it once Players have played the Quest.
 - `image` (optional): see [Images](#images).
 - `meter`: the meter's name, such as "Notoriety". Give one exactly when `ruleModules` turns on `meter`.
 - `name`: what Players see, on one line of at most 80 characters.
@@ -48,7 +48,6 @@ export default quest({
 
 Every text, such as a name, a description, or the `currency`, must hold more than spaces, tabs, or line breaks.
 No two Quests may share an id or a name, even across the directories QUESTS_DIR lists.
-`/quest start` shows at most 25 Quests, so the bot won't start with more.
 
 ## characters/
 

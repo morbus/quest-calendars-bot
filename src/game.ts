@@ -172,7 +172,7 @@ function pressButton(quests: Quest[], button: string): Reply {
 		return showCharacter(quest, indexIn(args[2], quest.characters));
 	}
 	if (kind === 'character' && args.length === 2) {
-		indexIn(args[1], questWithId(args[0]).characters);
+		if (!questWithId(args[0]).characters.some((character) => character.id === args[1])) throw unknown;
 		return { sections: [{ text: 'Starting a Quest is coming soon.' }] };
 	}
 	throw unknown;
@@ -224,7 +224,7 @@ function showCharacter(quest: Quest, index: number): Reply {
 	const count = quest.characters.length;
 	const [previous, next] = browseButtons(`characters:${quest.id}`, index, count);
 	return {
-		buttons: [previous, { id: `character:${quest.id}:${index}`, label: 'Choose this Character' }, next],
+		buttons: [previous, { id: `character:${quest.id}:${character.id}`, label: 'Choose this Character' }, next],
 		card: card(
 			character,
 			character.description,
