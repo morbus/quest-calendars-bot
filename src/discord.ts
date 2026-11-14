@@ -203,7 +203,8 @@ function splitText(text: string): string[] {
 		rest = rest.slice(lineBreak > 0 ? end + 1 : end);
 	}
 	pieces.push(rest);
-	return pieces;
+	// Discord refuses a message of only whitespace, such as what a trailing line break leaves.
+	return pieces.filter((piece) => piece.trim() !== '');
 }
 
 /**

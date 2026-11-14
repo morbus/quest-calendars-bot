@@ -117,3 +117,12 @@ test('a single character longer than a message is cut at 2000', () => {
 		[2000, 501],
 	);
 });
+
+test('a split that leaves only blank text sends no empty message', () => {
+	const messages = toMessages({ sections: [{ text: `${'x'.repeat(2000)}\n\n` }] });
+
+	assert.deepEqual(
+		messages.map((message) => message.content),
+		['x'.repeat(2000)],
+	);
+});
