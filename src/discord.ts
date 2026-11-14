@@ -291,6 +291,9 @@ export function toDiscord(reply: Reply) {
 			: part(component);
 	return {
 		components: components.map(topLevel),
+		// Cleared, so this can replace a message the bot sent with text or embeds before it used Components V2.
+		content: null,
+		embeds: [],
 		files: [...names].map(([{ data }, name]) => ({ attachment: data, name })),
 		flags: MessageFlags.IsComponentsV2 as const,
 	};

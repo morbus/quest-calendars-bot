@@ -157,7 +157,11 @@ test('every part is sent as its Discord counterpart, with the options it sets, a
 		],
 	});
 
-	assert.deepEqual(Object.keys(message).sort(), ['components', 'files', 'flags']);
+	assert.deepEqual(Object.keys(message).sort(), ['components', 'content', 'embeds', 'files', 'flags']);
+	// Discord turns a message into Components V2 only once its text and embeds are cleared,
+	// such as a message the bot sent with embeds before it used Components V2.
+	assert.equal(message.content, null);
+	assert.deepEqual(message.embeds, []);
 	assert.equal(message.flags, MessageFlags.IsComponentsV2);
 	assert.deepEqual(message.files, [
 		{ attachment: map.data, name: 'map.png' },
