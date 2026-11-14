@@ -1,8 +1,8 @@
 import { character } from '../../../../../src/builder.ts';
 
 /**
- * Forty-five Abilities of about 120 characters each, about 5,400 in all, the longest text on the card,
- * so the card cuts the Abilities short and keeps the description whole.
+ * Forty-five Abilities of about 120 characters each, about 5,400 in all: more text than one Discord message
+ * shows, though the description is short, so startup refuses this Character.
  */
 const abilities = Array.from({ length: 45 }, (_, i) => ({
 	name: `Index ${i + 1} of 45`,

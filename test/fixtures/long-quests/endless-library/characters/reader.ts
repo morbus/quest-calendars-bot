@@ -10,8 +10,8 @@ const paragraphs = Array.from(
 );
 
 /**
- * Twenty Abilities of about 110 characters each, about 2,200 in all: long, but shorter than the description,
- * so the card cuts only the description.
+ * Twenty Abilities of about 110 characters each, about 2,200 in all. Neither these nor the description is
+ * more text than one Discord message shows, but together they are, so startup refuses this Character.
  */
 const abilities = Array.from({ length: 20 }, (_, i) => ({
 	name: `Bookmark ${i + 1} of 20`,

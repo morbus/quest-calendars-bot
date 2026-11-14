@@ -16,7 +16,7 @@ export type Input = { command: 'quest start' } | { button: string };
  * What an Input shows the Player who sent it.
  *
  * @remarks
- * The Game lays it out; the Discord adapter splits it into as many messages as it needs.
+ * The Game lays it out; the Discord adapter sends it as one message.
  */
 export type Reply = {
 	/**

@@ -40,6 +40,11 @@ const MAX_FILES = 10;
 const MAX_TEXT_LENGTH = 4000;
 
 /**
+ * Discord's size for each {@link Separator} spacing.
+ */
+const SEPARATOR_SPACINGS = { large: SeparatorSpacingSize.Large, small: SeparatorSpacingSize.Small };
+
+/**
  * Discord's color for each {@link Button} style.
  */
 const BUTTON_STYLES = {
@@ -233,8 +238,8 @@ export function toDiscord(reply: Reply) {
 	const names = attachmentNames(imagesIn(components));
 	const url = (image: Image): APIUnfurledMediaItem => ({ url: `attachment://${names.get(image)}` });
 	const media = ({ description, media, spoiler }: Media) => ({
-		media: url(media),
 		...(description === undefined ? {} : { description }),
+		media: url(media),
 		...(spoiler === undefined ? {} : { spoiler }),
 	});
 	const button = (button: Button | LinkButton): APIButtonComponent => {
@@ -298,11 +303,6 @@ export function toDiscord(reply: Reply) {
 		flags: MessageFlags.IsComponentsV2 as const,
 	};
 }
-
-/**
- * Discord's size for each {@link Separator} spacing.
- */
-const SEPARATOR_SPACINGS = { large: SeparatorSpacingSize.Large, small: SeparatorSpacingSize.Small };
 
 /**
  * A name for each of `images` that Discord can link to: anything but letters, digits, `.`, `-`, and `_`

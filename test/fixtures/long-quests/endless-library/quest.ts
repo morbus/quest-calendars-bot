@@ -1,8 +1,8 @@
 import { quest } from '../../../../src/builder.ts';
 
 /**
- * Twelve numbered paragraphs of about 500 characters each, about 6,000 in all, so the card cuts the
- * description short and the last paragraph number shown says where the cut fell.
+ * Twelve numbered paragraphs of about 500 characters each, about 6,000 in all: more text than one Discord
+ * message shows, so startup refuses this Quest.
  */
 const shelves = Array.from(
 	{ length: 12 },

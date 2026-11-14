@@ -46,7 +46,11 @@ function allParts(reply: Reply): Component[] {
  */
 function buttonsIn(reply: Reply): Button[] {
 	return allParts(reply)
-		.flatMap((part) => (part.type === 'actionRow' ? part.components : []))
+		.flatMap((part) => {
+			if (part.type === 'actionRow') return part.components;
+			if (part.type === 'section') return [part.accessory];
+			return [];
+		})
 		.filter((button): button is Button => button.type === 'button');
 }
 
@@ -142,6 +146,7 @@ test('Previous on the first Quest wraps around to the last, and Next on the last
 
 	const last = press(game, first, 'Previous');
 
+	assert.ok(textsIn(last).some((text) => text.startsWith('## The Clockwork Tower\n')));
 	assert.ok(textsIn(last).includes('-# Quest 2 of 2'));
 	assert.deepEqual(press(game, last, 'Next'), first);
 });
