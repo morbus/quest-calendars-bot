@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createGame, type Game, type Reply } from '../src/game.ts';
-import { loadQuests, type Image, type Quest } from '../src/registry.ts';
+import { loadQuests, MAX_ID_LENGTH, type Image, type Quest } from '../src/registry.ts';
 import { openStorage } from '../src/storage.ts';
 
 /**
@@ -199,7 +199,7 @@ test('choosing a Character says starting a Quest is coming soon', () => {
 /**
  * The fixture Quests, with The Clockwork Tower's Characters narrowed to those `keep` accepts.
  */
-function towerKeeping(keep: (name: string) => boolean): Quest[] {
+function questsWithTowerCharacters(keep: (name: string) => boolean): Quest[] {
 	return QUESTS.map((quest) =>
 		quest.id === 'clockwork-tower'
 			? { ...quest, characters: quest.characters.filter((character) => keep(character.name)) }
@@ -212,8 +212,8 @@ test('an old Choose this Character button still chooses the same Character after
 	const tinker = press(before, chooseQuest(before, 'The Clockwork Tower'), 'Next');
 	const choose = tinker.buttons?.find((button) => button.label === 'Choose this Character')?.id ?? '';
 
-	const after = newGame(towerKeeping((name) => name === 'Tinker'));
-	const gone = newGame(towerKeeping((name) => name !== 'Tinker'));
+	const after = newGame(questsWithTowerCharacters((name) => name === 'Tinker'));
+	const gone = newGame(questsWithTowerCharacters((name) => name !== 'Tinker'));
 
 	assert.deepEqual(after.handle('player-1', 'server-1', { button: choose }, NOW).reply, {
 		sections: [{ text: 'Starting a Quest is coming soon.' }],
@@ -225,19 +225,16 @@ test("every button id fits in Discord's 100 characters when Quest and Character 
 	const quest = QUESTS.find((quest) => quest.id === 'clockwork-tower')!;
 	const long = {
 		...quest,
-		characters: quest.characters.map((character, i) => ({ ...character, id: `${i}`.repeat(44) })),
-		id: 'q'.repeat(44),
+		characters: quest.characters.map((character, i) => ({ ...character, id: `${i}`.repeat(MAX_ID_LENGTH) })),
+		id: 'q'.repeat(MAX_ID_LENGTH),
 	};
 	const game = newGame([long]);
 
-	const characters = press(
-		game,
-		game.handle('player-1', 'server-1', { command: 'quest start' }, NOW).reply,
-		'Choose this Quest',
-	);
+	const quests = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW).reply;
+	const characters = press(game, quests, 'Choose this Quest');
 
-	const ids = characters.buttons?.map((button) => button.id) ?? [];
-	assert.equal(ids.length, 3);
+	const ids = [...(quests.buttons ?? []), ...(characters.buttons ?? [])].map((button) => button.id);
+	assert.equal(ids.length, 6);
 	for (const id of ids) assert.ok(id.length <= 100, `${id} is ${id.length} characters`);
 });
 
