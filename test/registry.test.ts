@@ -90,11 +90,11 @@ test('Characters in different Quests can share an id', async () => {
 test('a Character whose Damage is not a die fails to load', async () => {
 	await assert.rejects(
 		load([{ characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, damage: 'lots' } }] }]),
-		/characters\/character-1\.ts: stats\.damage must be dice, such as d6 or 2d4, not lots/,
+		/characters\/character-1\.ts: stats\.damage must be dice, such as d6 or 2d4, not "lots"/,
 	);
 	await assert.rejects(
 		load([{ characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, damage: 'a d6 and a d4' } }] }]),
-		/characters\/character-1\.ts: stats\.damage must be dice, such as d6 or 2d4, not a d6 and a d4/,
+		/characters\/character-1\.ts: stats\.damage must be dice, such as d6 or 2d4, not "a d6 and a d4"/,
 	);
 });
 
@@ -119,7 +119,7 @@ test('a Quest that turns on the meter Rule Module without naming the meter fails
 test('a Quest whose id is not lowercase letters, digits, and hyphens fails to load', async () => {
 	await assert.rejects(
 		load([{ metadata: { ...METADATA, id: 'Amber Road' } }]),
-		/quest-1\/quest\.ts: id must be lowercase letters, digits, and hyphens, not Amber Road/,
+		/quest-1\/quest\.ts: id must be lowercase letters, digits, and hyphens, not "Amber Road"/,
 	);
 });
 
@@ -166,6 +166,153 @@ test('a Quest directory without a quest.ts fails to load, naming the file', asyn
 test('a Character whose id is not lowercase letters, digits, and hyphens fails to load', async () => {
 	await assert.rejects(
 		load([{ characters: [{ ...CHARACTER, id: 'pilgrim one' }] }]),
-		/characters\/character-1\.ts: id must be lowercase letters, digits, and hyphens, not pilgrim one/,
+		/characters\/character-1\.ts: id must be lowercase letters, digits, and hyphens, not "pilgrim one"/,
 	);
+});
+
+/**
+ * Quests that fail to load, each with the error that names what is wrong.
+ */
+const MALFORMED: { error: RegExp; name: string; quest: { characters?: unknown[]; metadata?: unknown } }[] = [
+	{
+		name: 'Quest metadata that is not an object',
+		quest: { metadata: null },
+		error: /quest\.ts: the default export must be an object, not null/,
+	},
+	{
+		name: 'a Quest with no id',
+		quest: { metadata: { ...METADATA, id: undefined } },
+		error: /quest\.ts: id must be lowercase letters, digits, and hyphens, not undefined/,
+	},
+	{
+		name: 'a Quest id over 64 characters',
+		quest: { metadata: { ...METADATA, id: 'a'.repeat(65) } },
+		error: /quest\.ts: id must be at most 64 characters/,
+	},
+	{
+		name: 'a Quest with no name',
+		quest: { metadata: { ...METADATA, name: undefined } },
+		error: /quest\.ts: name must be text of 1 to 80 characters, not undefined/,
+	},
+	{
+		name: 'a Quest with an empty name',
+		quest: { metadata: { ...METADATA, name: '' } },
+		error: /quest\.ts: name must be text of 1 to 80 characters, not ""/,
+	},
+	{
+		name: 'a Quest name over 80 characters',
+		quest: { metadata: { ...METADATA, name: 'A'.repeat(81) } },
+		error: /quest\.ts: name must be text of 1 to 80 characters, not "A{81}"/,
+	},
+	{
+		name: 'a completion flag that is not true or false',
+		quest: { metadata: { ...METADATA, complete: 'yes' } },
+		error: /quest\.ts: complete must be true or false, not "yes"/,
+	},
+	{
+		name: 'a Quest with no Currency',
+		quest: { metadata: { ...METADATA, currency: undefined } },
+		error: /quest\.ts: currency must be text, not undefined/,
+	},
+	{
+		name: 'Rule Modules that are not a list',
+		quest: { metadata: { ...METADATA, ruleModules: 'meter' } },
+		error: /quest\.ts: ruleModules must be a list, not "meter"/,
+	},
+	{
+		name: 'an empty meter name',
+		quest: { metadata: { ...METADATA, meter: '', ruleModules: ['meter'] } },
+		error: /quest\.ts: meter must be text, not ""/,
+	},
+	{
+		name: 'a Character that is not an object',
+		quest: { characters: [null] },
+		error: /character-1\.ts: the default export must be an object, not null/,
+	},
+	{
+		name: 'a Character id that is not text',
+		quest: { characters: [{ ...CHARACTER, id: 5 }] },
+		error: /character-1\.ts: id must be lowercase letters, digits, and hyphens, not 5/,
+	},
+	{
+		name: 'a Character with no name',
+		quest: { characters: [{ ...CHARACTER, name: undefined }] },
+		error: /character-1\.ts: name must be text of 1 to 80 characters, not undefined/,
+	},
+	{
+		name: 'a Character with no Stats',
+		quest: { characters: [{ ...CHARACTER, stats: undefined }] },
+		error: /character-1\.ts: stats must be an object, not undefined/,
+	},
+	{
+		name: 'a Damage that is not text',
+		quest: { characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, damage: ['d6'] } }] },
+		error: /character-1\.ts: stats\.damage must be dice, such as d6 or 2d4, not \["d6"\]/,
+	},
+	{
+		name: 'a Character with no Traits',
+		quest: { characters: [{ ...CHARACTER, traits: undefined }] },
+		error: /character-1\.ts: traits must be an object, not undefined/,
+	},
+	{
+		name: 'a Character with no Abilities',
+		quest: { characters: [{ ...CHARACTER, abilities: undefined }] },
+		error: /character-1\.ts: abilities must be a list, not undefined/,
+	},
+	{
+		name: 'an Ability that is not an object',
+		quest: { characters: [{ ...CHARACTER, abilities: ['Devout'] }] },
+		error: /character-1\.ts: abilities\[0\] must be an object, not "Devout"/,
+	},
+	{
+		name: 'an Ability with no name',
+		quest: { characters: [{ ...CHARACTER, abilities: [{ text: 'Add +1 to Wisdom rolls.' }] }] },
+		error: /character-1\.ts: abilities\[0\]\.name must be text, not undefined/,
+	},
+	{
+		name: 'an Ability with no text',
+		quest: { characters: [{ ...CHARACTER, abilities: [{ name: 'Devout' }] }] },
+		error: /character-1\.ts: abilities\[0\]\.text must be text, not undefined/,
+	},
+];
+
+for (const { error, name, quest } of MALFORMED) {
+	test(`${name} fails to load`, async () => {
+		await assert.rejects(load([quest]), error);
+	});
+}
+
+test('a Quest directory without a characters directory fails to load', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await mkdir(join(dir.path, 'quest-1'));
+	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', METADATA));
+
+	await assert.rejects(loadQuests(dir.path), /quest-1\/characters: has no Characters/);
+});
+
+test('hidden directories, such as .git, are not Quests', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await mkdir(join(dir.path, '.git'));
+
+	await assert.deepEqual(await loadQuests(dir.path), []);
+});
+
+test('names of 80 characters and ids of 64 load', async () => {
+	await assert.doesNotReject(
+		load([
+			{
+				characters: [{ ...CHARACTER, id: 'p'.repeat(64), name: 'P'.repeat(80) }],
+				metadata: { ...METADATA, id: 'a'.repeat(64), name: 'A'.repeat(80) },
+			},
+		]),
+	);
+});
+
+test('a characters that is a file, not a directory, fails to load', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await mkdir(join(dir.path, 'quest-1'));
+	await writeFile(join(dir.path, 'quest-1', 'quest.ts'), source('quest', METADATA));
+	await writeFile(join(dir.path, 'quest-1', 'characters'), '');
+
+	await assert.rejects(loadQuests(dir.path), /ENOTDIR/);
 });

@@ -13,6 +13,16 @@ import { RULE_MODULES, TRAITS, type Character, type QuestMetadata } from './buil
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
+ * The longest id, which keeps the button ids made from it within Discord's 100 characters.
+ */
+const ID_LENGTH = 64;
+
+/**
+ * The longest Quest or Character name, which is Discord's limit for a button label.
+ */
+const NAME_LENGTH = 80;
+
+/**
  * Dice to roll, such as "d6" or "2d4".
  */
 const DICE = /^([1-9]\d*)?d[1-9]\d*$/;
@@ -31,14 +41,18 @@ export async function loadQuests(dir: string): Promise<Quest[]> {
 	const quests: Quest[] = [];
 	const questIds = new Map<string, string>();
 	for (const entry of await readdir(dir, { withFileTypes: true })) {
-		if (!entry.isDirectory()) continue;
+		if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
 		const questDir = join(dir, entry.name);
 		const metadataFile = join(questDir, 'quest.ts');
 		const metadata = await loadFile(metadataFile, checkMetadata);
 		claimId(questIds, metadata.id, metadataFile);
 		const characters: Character[] = [];
 		const characterIds = new Map<string, string>();
-		for (const name of await readdir(join(questDir, 'characters'))) {
+		const characterNames = await readdir(join(questDir, 'characters')).catch((error) => {
+			if (error.code === 'ENOENT') return [];
+			throw error;
+		});
+		for (const name of characterNames) {
 			if (!name.endsWith('.ts')) continue;
 			const file = join(questDir, 'characters', name);
 			const character = await loadFile(file, checkCharacter);
@@ -61,10 +75,9 @@ function byName(a: { name: string }, b: { name: string }): number {
 /**
  * Records that `file` declares `id`.
  *
- * @throws When `id` isn't lowercase letters, digits, and hyphens, or an earlier file in `ids` declared it.
+ * @throws When an earlier file in `ids` declared `id`.
  */
 function claimId(ids: Map<string, string>, id: string, file: string): void {
-	if (!ID.test(id)) throw new Error(`${file}: id must be lowercase letters, digits, and hyphens, not ${id}`);
 	const earlier = ids.get(id);
 	if (earlier) throw new Error(`${file}: id ${id} is already used by ${earlier}`);
 	ids.set(id, file);
@@ -89,14 +102,22 @@ async function loadFile<T>(file: string, check: (value: unknown) => T): Promise<
  * @throws When it isn't.
  */
 function checkMetadata(value: unknown): QuestMetadata {
+	checkObject('the default export', value);
 	const metadata = value as QuestMetadata;
+	checkId(metadata.id);
+	checkText('name', metadata.name, NAME_LENGTH);
+	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
+	checkText('currency', metadata.currency);
+	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
 	for (const ruleModule of metadata.ruleModules) {
 		if (!RULE_MODULES.includes(ruleModule)) throw new Error(`ruleModules has an unknown Rule Module: ${ruleModule}`);
 	}
 	const hasMeter = metadata.ruleModules.includes('meter');
-	if (metadata.meter !== undefined && !hasMeter)
-		throw new Error("meter is named, but ruleModules doesn't turn on meter");
-	if (hasMeter && !metadata.meter) throw new Error('ruleModules turns on meter, but meter has no name');
+	if (metadata.meter !== undefined) {
+		if (!hasMeter) throw new Error("meter is named, but ruleModules doesn't turn on meter");
+		checkText('meter', metadata.meter);
+	}
+	if (hasMeter && metadata.meter === undefined) throw new Error('ruleModules turns on meter, but meter has no name');
 	return metadata;
 }
 
@@ -106,18 +127,45 @@ function checkMetadata(value: unknown): QuestMetadata {
  * @throws When it isn't.
  */
 function checkCharacter(value: unknown): Character {
+	checkObject('the default export', value);
 	const character = value as Character;
-	if (!DICE.test(character.stats.damage)) {
-		throw new Error(`stats.damage must be dice, such as d6 or 2d4, not ${character.stats.damage}`);
-	}
-	const { maxHealth } = character.stats;
-	if (!Number.isInteger(maxHealth) || maxHealth < 1) {
-		throw new Error(`stats.maxHealth must be a whole number of at least 1, not ${maxHealth}`);
-	}
-	checkWholeNumber('stats.attack', character.stats.attack);
-	checkWholeNumber('stats.defense', character.stats.defense);
+	checkId(character.id);
+	checkText('name', character.name, NAME_LENGTH);
+	checkObject('stats', character.stats);
+	const { attack, damage, defense, maxHealth } = character.stats;
+	if (typeof damage !== 'string' || !DICE.test(damage)) fail('stats.damage', 'dice, such as d6 or 2d4', damage);
+	if (!Number.isInteger(maxHealth) || maxHealth < 1) fail('stats.maxHealth', 'a whole number of at least 1', maxHealth);
+	checkWholeNumber('stats.attack', attack);
+	checkWholeNumber('stats.defense', defense);
+	checkObject('traits', character.traits);
 	for (const trait of TRAITS) checkWholeNumber(`traits.${trait}`, character.traits[trait]);
+	if (!Array.isArray(character.abilities)) fail('abilities', 'a list', character.abilities);
+	for (const [i, ability] of character.abilities.entries()) {
+		checkObject(`abilities[${i}]`, ability);
+		checkText(`abilities[${i}].name`, ability.name);
+		checkText(`abilities[${i}].text`, ability.text);
+	}
 	return character;
+}
+
+/**
+ * Accepts a Quest or Character id.
+ *
+ * @throws When it isn't lowercase letters, digits, and hyphens, or is too long.
+ */
+function checkId(id: unknown): void {
+	if (typeof id !== 'string' || !ID.test(id)) fail('id', 'lowercase letters, digits, and hyphens', id);
+	if (id.length > ID_LENGTH) fail('id', `at most ${ID_LENGTH} characters`, id);
+}
+
+/**
+ * Accepts text that isn't empty, of at most `maxLength` characters if given.
+ *
+ * @throws When `value`, at `field`, isn't.
+ */
+function checkText(field: string, value: unknown, maxLength?: number): void {
+	const ok = typeof value === 'string' && value.length > 0 && value.length <= (maxLength ?? value.length);
+	if (!ok) fail(field, maxLength === undefined ? 'text' : `text of 1 to ${maxLength} characters`, value);
 }
 
 /**
@@ -125,6 +173,22 @@ function checkCharacter(value: unknown): Character {
  *
  * @throws When `value`, at `field`, isn't one.
  */
-function checkWholeNumber(field: string, value: number): void {
-	if (!Number.isInteger(value)) throw new Error(`${field} must be a whole number, not ${value}`);
+function checkWholeNumber(field: string, value: unknown): void {
+	if (!Number.isInteger(value)) fail(field, 'a whole number', value);
+}
+
+/**
+ * Accepts an object, such as the Stats.
+ *
+ * @throws When `value`, at `field`, isn't one.
+ */
+function checkObject(field: string, value: unknown): void {
+	if (typeof value !== 'object' || value === null) fail(field, 'an object', value);
+}
+
+/**
+ * Rejects `value`, at `field`, for not being what was `expected`.
+ */
+function fail(field: string, expected: string, value: unknown): never {
+	throw new Error(`${field} must be ${expected}, not ${JSON.stringify(value)}`);
 }
