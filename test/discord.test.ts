@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { toDiscord, toMessages } from '../src/discord.ts';
-import type { Button } from '../src/game.ts';
+import type { Button, Card } from '../src/game.ts';
 import type { Image } from '../src/registry.ts';
 
 /**
@@ -171,10 +171,90 @@ test("a message's images are sent as attachments with their bytes and names, and
 	assert.deepEqual(JSON.parse(JSON.stringify(components)), [
 		{
 			components: [
-				{ custom_id: 'b1', label: 'Button 1', style: 1, type: 2 },
-				{ custom_id: 'b2', label: 'Button 2', style: 1, type: 2 },
+				{ custom_id: 'b1', disabled: false, label: 'Button 1', style: 1, type: 2 },
+				{ custom_id: 'b2', disabled: false, label: 'Button 2', style: 1, type: 2 },
 			],
 			type: 1,
 		},
 	]);
+});
+
+test("a reply's card goes on its last message, with the buttons, and its image is attached there", () => {
+	const card = { description: 'Climb.', fields: [], footer: 'Quest 2 of 2', image: image('tower.png'), title: 'Tower' };
+
+	const messages = toMessages({ buttons: buttons(3), card, sections: [{ text: 'Choose a Quest.' }] });
+
+	assert.deepEqual(messages, [
+		{ buttonRows: [buttons(3)], card, content: 'Choose a Quest.', files: [image('tower.png')] },
+	]);
+});
+
+test('a reply with a card and no text is still one message', () => {
+	const card = { description: 'Climb.', fields: [], footer: 'Quest 1 of 1', title: 'Tower' };
+
+	const messages = toMessages({ buttons: buttons(1), card, sections: [] });
+
+	assert.deepEqual(messages, [{ buttonRows: [buttons(1)], card, content: '', files: [] }]);
+});
+
+test("a card is sent as an embed showing its attached image, and a disabled button can't be pressed", () => {
+	const map = { data: Buffer.from('map bytes'), name: 'carte du ✨ monde.png' };
+	const card = {
+		description: 'Climb.',
+		fields: [{ name: 'Stats', value: 'Max Health 10' }],
+		footer: 'Quest 1 of 2',
+		image: map,
+		title: 'Tower',
+	};
+
+	const { components, embeds, files } = toDiscord({
+		buttonRows: [[{ disabled: true, id: 'prev', label: 'Previous' }]],
+		card,
+		content: '',
+		files: [map],
+	});
+
+	assert.deepEqual(JSON.parse(JSON.stringify(embeds)), [
+		{
+			description: 'Climb.',
+			fields: [{ name: 'Stats', value: 'Max Health 10' }],
+			footer: { text: 'Quest 1 of 2' },
+			image: { url: 'attachment://carte_du___monde.png' },
+			title: 'Tower',
+		},
+	]);
+	assert.deepEqual(files, [{ attachment: Buffer.from('map bytes'), name: 'carte_du___monde.png' }]);
+	assert.equal(JSON.parse(JSON.stringify(components))[0].components[0].disabled, true);
+});
+
+/**
+ * The embed `toDiscord` builds for a message showing `card`, as Discord receives it.
+ */
+function embedFor(card: Card) {
+	const { embeds } = toDiscord({ buttonRows: [], card, content: '', files: [] });
+	return JSON.parse(JSON.stringify(embeds))[0];
+}
+
+test("a card's description and fields are cut short, with an ellipsis, to fit an embed", () => {
+	const embed = embedFor({
+		description: 'd'.repeat(5000),
+		fields: [{ name: 'Abilities', value: 'a'.repeat(2000) }],
+		footer: 'Quest 1 of 1',
+		title: 'Tower',
+	});
+
+	assert.equal(embed.description, `${'d'.repeat(4095)}…`);
+	assert.equal(embed.fields[0].value, `${'a'.repeat(1023)}…`);
+});
+
+test('a card whose parts each fit but together pass 6000 characters has its description cut to fit', () => {
+	const fields = ['Stats', 'Traits', 'Abilities'].map((name) => ({ name, value: 'v'.repeat(1000) }));
+
+	const embed = embedFor({ description: 'd'.repeat(4000), fields, footer: 'Quest 1 of 1', title: 'Tower' });
+
+	const length = [embed.title, embed.description, embed.footer.text, ...fields.flatMap((f) => [f.name, f.value])].join(
+		'',
+	).length;
+	assert.equal(length, 6000);
+	assert.ok(embed.description.endsWith('…'));
 });

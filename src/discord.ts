@@ -8,6 +8,7 @@ import {
 	ButtonBuilder,
 	ButtonStyle,
 	Client,
+	EmbedBuilder,
 	Events,
 	InteractionContextType,
 	MessageFlags,
@@ -15,7 +16,7 @@ import {
 	type ButtonInteraction,
 	type ChatInputCommandInteraction,
 } from 'discord.js';
-import type { Button, Game, Input, Reply } from './game.ts';
+import type { Button, Card, Game, Input, Reply } from './game.ts';
 import { MAX_IMAGE_BYTES, type Image } from './registry.ts';
 import { logger } from './log.ts';
 
@@ -40,6 +41,11 @@ const MAX_FILES = 10;
 const SECTION_BREAK = '\n\n';
 
 /**
+ * The most characters Discord shows in each part of an embed, and in all of them together.
+ */
+const EMBED_LIMITS = { description: 4096, fieldName: 256, fieldValue: 1024, footer: 2048, title: 256, total: 6000 };
+
+/**
  * Splits text into graphemes, the characters a reader sees, keeping emoji such as flags whole.
  */
 const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
@@ -52,6 +58,10 @@ export type Message = {
 	 * The buttons below the text, in rows.
 	 */
 	buttonRows: Button[][];
+	/**
+	 * A Quest or Character to show below the text, as an embed.
+	 */
+	card?: Card;
 	/**
 	 * The text, at most {@link MAX_CONTENT_LENGTH} characters.
 	 */
@@ -167,7 +177,7 @@ function toInput(command: string): Input {
 }
 
 /**
- * Splits a {@link Reply} into as few Discord messages as fit its text and images, with its buttons on the last.
+ * Splits a {@link Reply} into as few Discord messages as fit its text and images, with its card and buttons on the last.
  *
  * @remarks
  * Sections are joined by a blank line. A section that won't fit in one message is split at a line break,
@@ -187,6 +197,16 @@ export function toMessages(reply: Reply): Message[] {
 			}
 		}
 	}
+	if (reply.card !== undefined) {
+		const files = reply.card.image === undefined ? [] : [reply.card.image];
+		const last = messages.at(-1);
+		if (last !== undefined && hasRoomForFiles(last, files)) {
+			last.card = reply.card;
+			last.files.push(...files);
+		} else {
+			messages.push({ buttonRows: [], card: reply.card, content: '', files });
+		}
+	}
 	const buttons = reply.buttons ?? [];
 	for (let i = 0; i < buttons.length; i += BUTTONS_PER_ROW) {
 		messages.at(-1)?.buttonRows.push(buttons.slice(i, i + BUTTONS_PER_ROW));
@@ -198,12 +218,17 @@ export function toMessages(reply: Reply): Message[] {
  * Whether `message` has room for `text`, after a {@link SECTION_BREAK}, and `files`.
  */
 function fitsIn(message: Message, text: string, files: Image[]): boolean {
-	const all = [...message.files, ...files];
 	return (
-		message.content.length + SECTION_BREAK.length + text.length <= MAX_CONTENT_LENGTH &&
-		all.length <= MAX_FILES &&
-		bytes(all) <= MAX_IMAGE_BYTES
+		message.content.length + SECTION_BREAK.length + text.length <= MAX_CONTENT_LENGTH && hasRoomForFiles(message, files)
 	);
+}
+
+/**
+ * Whether `message` can attach `files` as well as its own.
+ */
+function hasRoomForFiles(message: Message, files: Image[]): boolean {
+	const all = [...message.files, ...files];
+	return all.length <= MAX_FILES && bytes(all) <= MAX_IMAGE_BYTES;
 }
 
 /**
@@ -232,28 +257,76 @@ function splitText(text: string): string[] {
 }
 
 /**
- * Where the last grapheme that fits in {@link MAX_CONTENT_LENGTH} characters of `text` ends.
+ * Where the last grapheme that fits in `max` characters of `text` ends.
  */
-function lastGraphemeBreak(text: string): number {
+function lastGraphemeBreak(text: string, max = MAX_CONTENT_LENGTH): number {
 	let end = 0;
 	for (const { index } of GRAPHEMES.segment(text)) {
-		if (index > MAX_CONTENT_LENGTH) break;
+		if (index > max) break;
 		end = index;
 	}
-	// A single grapheme longer than a message can only be cut.
-	return end > 0 ? end : MAX_CONTENT_LENGTH;
+	// A single grapheme longer than the limit can only be cut.
+	return end > 0 ? end : max;
 }
 
 /**
  * Builds a {@link Message} with discord.js.
  */
-export function toDiscord({ buttonRows, content, files }: Message) {
+export function toDiscord({ buttonRows, card, content, files }: Message) {
 	const components = buttonRows.map((row) =>
 		new ActionRowBuilder<ButtonBuilder>().addComponents(
 			row.map((button) =>
-				new ButtonBuilder().setCustomId(button.id).setLabel(button.label).setStyle(ButtonStyle.Primary),
+				new ButtonBuilder()
+					.setCustomId(button.id)
+					.setDisabled(button.disabled ?? false)
+					.setLabel(button.label)
+					.setStyle(ButtonStyle.Primary),
 			),
 		),
 	);
-	return { components, content, files: files.map(({ data, name }) => ({ attachment: data, name })) };
+	return {
+		components,
+		content,
+		embeds: card === undefined ? [] : [toEmbed(card)],
+		files: files.map(({ data, name }) => ({ attachment: data, name: attachmentName(name) })),
+	};
+}
+
+/**
+ * Builds a {@link Card} as a Discord embed, showing its image from the message's attachments.
+ *
+ * @remarks
+ * Text too long for an embed is cut short with an ellipsis. When the parts together are too long,
+ * the description gives way, since the name, Stats, Traits, and Abilities matter more.
+ */
+function toEmbed(card: Card): EmbedBuilder {
+	const title = clip(card.title, EMBED_LIMITS.title);
+	const footer = clip(card.footer, EMBED_LIMITS.footer);
+	const fields = card.fields.map(({ name, value }) => ({
+		name: clip(name, EMBED_LIMITS.fieldName),
+		value: clip(value, EMBED_LIMITS.fieldValue),
+	}));
+	const used = [title, footer, ...fields.flatMap(({ name, value }) => [name, value])].join('').length;
+	const description = clip(card.description, Math.min(EMBED_LIMITS.description, EMBED_LIMITS.total - used));
+	const embed = new EmbedBuilder()
+		.setTitle(title)
+		.setDescription(description)
+		.addFields(fields)
+		.setFooter({ text: footer });
+	return card.image === undefined ? embed : embed.setImage(`attachment://${attachmentName(card.image.name)}`);
+}
+
+/**
+ * `text`, cut to at most `max` characters between graphemes, ending in an ellipsis when it was cut.
+ */
+function clip(text: string, max: number): string {
+	return text.length <= max ? text : `${text.slice(0, lastGraphemeBreak(text, max - 1))}…`;
+}
+
+/**
+ * An image's name as Discord can link to it from an embed, with anything but letters, digits, `.`, `-`,
+ * and `_` replaced by `_`.
+ */
+function attachmentName(name: string): string {
+	return name.replace(/[^\w.-]/gu, '_');
 }
