@@ -75,14 +75,6 @@ function newGame(quests: Quest[] = QUESTS): Game {
 	return createGame({ quests, storage: openStorage(':memory:') });
 }
 
-test('/quest start says Quests are coming soon when there are none', () => {
-	const game = newGame([]);
-
-	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
-
-	assert.deepEqual(reply, { components: [{ content: 'Quests are coming soon.', type: 'textDisplay' }] });
-});
-
 test('/quest start shows the first Quest on its own, with buttons to choose it or move through the rest', () => {
 	const game = newGame();
 

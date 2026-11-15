@@ -80,7 +80,7 @@ export type Quest = Loaded<QuestMetadata> & {
 /**
  * Loads every Quest directory in each of `dirs`, sorted by name.
  *
- * @throws When a Quest is invalid, naming the file at fault and the problem.
+ * @throws When a Quest is invalid, naming the file at fault and the problem, or when there are no Quests.
  */
 export async function loadQuests(dirs: string[]): Promise<Quest[]> {
 	const quests: Quest[] = [];
@@ -88,6 +88,7 @@ export async function loadQuests(dirs: string[]): Promise<Quest[]> {
 	for (const dir of dirs) {
 		quests.push(...(await loadQuestsIn(dir, claims)));
 	}
+	if (quests.length === 0) throw new Error(`${dirs.join(':')}: has no Quests`);
 	return quests.sort(byName);
 }
 

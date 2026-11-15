@@ -382,8 +382,25 @@ test('a Quest directory without a characters directory fails to load', async () 
 test('hidden directories, such as .git, are not Quests', async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	await mkdir(join(dir.path, '.git'));
+	await symlink(fileURLToPath(new URL('fixtures/quests/pilgrimage', import.meta.url)), join(dir.path, 'pilgrimage'));
 
-	assert.deepEqual(await loadQuests([dir.path]), []);
+	const quests = await loadQuests([dir.path]);
+
+	assert.deepEqual(
+		quests.map((quest) => quest.name),
+		['The Amber Road'],
+	);
+});
+
+test('no Quests in any QUESTS_DIR directory fails to load', async () => {
+	await using first = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await using second = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	await mkdir(join(first.path, '.git'));
+
+	await assert.rejects(
+		loadQuests([first.path, second.path]),
+		new RegExp(`${first.path}:${second.path}: has no Quests`),
+	);
 });
 
 test('names of 80 characters and ids of 44 load', async () => {

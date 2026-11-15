@@ -1,7 +1,7 @@
 # Quests
 
 Each Quest is a directory here, or in another directory that QUESTS_DIR lists (see `.env.example`), loaded when the bot starts (`docs/adr/0001-pages-are-declarative-typescript.md`).
-The bot won't start while any Quest is invalid, and its error names the file at fault.
+The bot won't start without at least one Quest, or while any Quest is invalid, and its error names the file at fault.
 
 ```
 quests/
