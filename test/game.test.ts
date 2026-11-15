@@ -80,8 +80,7 @@ test('/quest start shows the first Quest on its own, with buttons to choose it o
 
 	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
 
-	assert.deepEqual(reply.components.slice(0, 2), [
-		{ content: 'Choose a Quest.', type: 'textDisplay' },
+	assert.deepEqual(reply.components.slice(0, 1), [
 		{
 			components: [
 				{ content: '## The Amber Road\nA pilgrimage along the old trade road.', type: 'textDisplay' },
@@ -91,7 +90,8 @@ test('/quest start shows the first Quest on its own, with buttons to choose it o
 			type: 'container',
 		},
 	]);
-	assert.equal(reply.components[2]?.type, 'actionRow');
+	assert.equal(reply.components[1]?.type, 'actionRow');
+	assert.equal(reply.components.length, 2);
 	assert.deepEqual(buttonStates(reply), [
 		{ disabled: false, label: 'Previous' },
 		{ disabled: false, label: 'Choose this Quest' },
@@ -115,7 +115,7 @@ test('Next shows the next Quest, with its image, and Previous goes back', () => 
 
 	const second = press(game, first, 'Next');
 
-	assert.deepEqual(second.components[1], {
+	assert.deepEqual(second.components[0], {
 		components: [
 			{ items: [{ media: image('clockwork-tower/tower.png') }], type: 'mediaGallery' },
 			{ content: '## The Clockwork Tower\nClimb a tower of gears before it strikes midnight.', type: 'textDisplay' },
@@ -157,8 +157,7 @@ test('choosing a Quest shows its first Character on its own, with their Stats, T
 
 	const reply = chooseQuest(game, 'The Clockwork Tower');
 
-	assert.deepEqual(reply.components.slice(0, 2), [
-		{ content: 'Choose a Character for The Clockwork Tower.', type: 'textDisplay' },
+	assert.deepEqual(reply.components.slice(0, 1), [
 		{
 			components: [
 				{ content: '## Iron Warden\nA guard who has never left her post.', type: 'textDisplay' },
@@ -187,7 +186,7 @@ test('Next shows the next Character, with their image, and Previous and Next wra
 
 	const second = press(game, first, 'Next');
 
-	assert.deepEqual(second.components[1], {
+	assert.deepEqual(second.components[0], {
 		components: [
 			{ items: [{ media: image('clockwork-tower/characters/tinker.PNG') }], type: 'mediaGallery' },
 			{ content: '## Tinker\nBuilds what the tower breaks.', type: 'textDisplay' },

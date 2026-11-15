@@ -5,11 +5,11 @@ export default character({
 	name: 'SD-247',
 	image: 'sd-247.png',
 	description: prose`
-		I am SD-247, a class II ship drone. The life forms on this ship call me "Es-Dee".
-		They are fond of me, as I am loyal to my duties and serve these life forms well.
-		My responsibilities include minor electrical repairs, computer servicing, cleaning,
-		sanitization, and extermination of invasive species. I have been servicing the Argyle
-		all my life and have only been off ship to repair the exterior.
+		I am SD-247, a class II ship drone. The life forms on this ship call me "Es-Dee". They
+		are fond of me, as I am loyal to my duties and serve them well. My responsibilities include
+		minor electrical repairs, computer servicing, cleaning, sanitization, and extermination
+		of invasive species. I have been servicing the _Argyle_ all my life and have only been
+		off ship to repair the exterior.
 	`,
 	stats: { maxHealth: 16, defense: 1, attack: 3, damage: 'd6' },
 	traits: { strength: -3, dexterity: 2, constitution: 2, intellect: 4, wisdom: -1, charisma: -2 },

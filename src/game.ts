@@ -181,7 +181,6 @@ function showCharacter(quest: Quest, index: number): Reply {
 	};
 	return {
 		components: [
-			text(`Choose a Character for ${quest.name}.`),
 			card(
 				character,
 				character.description,
@@ -205,7 +204,6 @@ function showQuest(quests: Quest[], index: number): Reply {
 	};
 	return {
 		components: [
-			text('Choose a Quest.'),
 			card(quest, quest.description, [], `Quest ${index + 1} of ${quests.length}`),
 			browseRow('quests', index, quests.length, choose),
 		],
