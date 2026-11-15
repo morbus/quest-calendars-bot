@@ -16,7 +16,7 @@ quests/
 
 Quest directories and Character files whose names start with `.` are skipped.
 
-`quest()` and `character()` come from `src/builder.ts`, whose types list every field.
+`quest()`, `character()`, and `prose` come from `src/builder.ts`, whose types list every field.
 `npm run typecheck` checks each field of a Quest in `quests/` as you write it, and startup checks every field of every Quest again.
 A Quest in another directory imports `src/builder.ts` from where this project is, and only startup checks it.
 
@@ -77,9 +77,38 @@ export default character({
 - `traits`: the starting Traits, each a whole number: `strength`, `dexterity`, `constitution`, `intellect`, `wisdom`, and `charisma`.
 - `abilities`: the starting Abilities, each a `name` and the `text` Players read, in the order Players see them. Use `[]` for none.
 
+## Long text
+
+`prose` from `src/builder.ts` lets you write a long text, such as a description, across as many lines as you like.
+A line break becomes a space and a blank line starts a new paragraph, so you can indent and wrap freely.
+
+```ts
+import { prose, quest } from '../../src/builder.ts';
+
+export default quest({
+	// …
+	description: prose`
+		Climb a tower of gears
+		before it strikes midnight.
+
+		Somewhere above, a bell waits.
+	`,
+});
+```
+
+Because every line break becomes a space, use a plain string, not `prose`, for text that needs its line breaks, such as a list.
+
 ## Images
 
 A Quest or a Character can show an image, such as a map or a portrait.
 `image` names a `.gif`, `.jpeg`, `.jpg`, `.png`, or `.webp` file relative to the file that names it, of at most 8 MiB, the most Discord takes in one message.
 A Quest is self-contained, so its images must be inside its own directory: a Character can use `../map.png`, but not a file in another Quest, an absolute path, or a symbolic link that leads outside.
 The bot reads images when it starts, so restart it after you change one.
+
+Discord shows a Quest's or Character's image as a banner across the top of its box, as wide as the box: about 500 pixels across on a computer, and narrower on a phone.
+For the best results:
+
+- Make it wide, from 3:1 to 16:9, and about 1100 to 1200 pixels across, such as 1200 × 400. That stays sharp on high-density screens without making the file needlessly large.
+- Keep the subject away from the far edges, and avoid small text and fine detail, which are hard to read on a phone.
+- Make it at least as wide as the box. Discord may show a narrower image at its own size against the left edge, rather than centered.
+- Keep the file to a few hundred KB. 8 MiB is the most the bot accepts, not a size to aim for.

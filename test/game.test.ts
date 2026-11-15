@@ -210,16 +210,20 @@ test('Next shows the next Character, with their image, and Previous and Next wra
 	assert.deepEqual(press(game, second, 'Next'), first);
 });
 
-test('a Quest with one Character disables Previous and Next', () => {
+test('a Quest with one Character shows only the button to choose them, with no Previous or Next', () => {
 	const game = newGame();
 
 	const reply = chooseQuest(game, 'The Amber Road');
 
-	assert.deepEqual(buttonStates(reply), [
-		{ disabled: true, label: 'Previous' },
-		{ disabled: false, label: 'Choose this Character' },
-		{ disabled: true, label: 'Next' },
-	]);
+	assert.deepEqual(buttonStates(reply), [{ disabled: false, label: 'Choose this Character' }]);
+});
+
+test('only one Quest shows only the button to choose it, with no Previous or Next', () => {
+	const game = newGame(QUESTS.filter((quest) => quest.name === 'The Amber Road'));
+
+	const { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
+
+	assert.deepEqual(buttonStates(reply), [{ disabled: false, label: 'Choose this Quest' }]);
 });
 
 test('a Character with no Abilities says so', () => {
@@ -270,7 +274,8 @@ test("every button id fits in Discord's 100 characters when Quest and Character 
 		characters: quest.characters.map((character, i) => ({ ...character, id: `${i}`.repeat(MAX_ID_LENGTH) })),
 		id: 'q'.repeat(MAX_ID_LENGTH),
 	};
-	const game = newGame([long]);
+	// A second Quest, so the first shows Previous and Next too.
+	const game = newGame([long, QUESTS.find((quest) => quest.id === 'amber-road')!]);
 
 	const quests = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW).reply;
 	const characters = press(game, quests, 'Choose this Quest');

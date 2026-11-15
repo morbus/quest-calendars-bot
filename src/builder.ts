@@ -66,6 +66,31 @@ export function character(character: Character): Character {
 }
 
 /**
+ * Turns a template written across many lines into paragraphs for a Player to read.
+ *
+ * @remarks
+ * A line break becomes a space, and a blank line starts a new paragraph.
+ * The indentation and the blank lines around the text are dropped.
+ *
+ * @example
+ * ```ts
+ * description: prose`
+ *     Climb a tower of gears
+ *     before it strikes midnight.
+ *
+ *     Somewhere above, a bell waits.
+ * `,
+ * ```
+ */
+export function prose(strings: TemplateStringsArray, ...values: unknown[]): string {
+	return String.raw({ raw: strings }, ...values)
+		.split(/\n\s*\n/)
+		.map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+		.filter((paragraph) => paragraph !== '')
+		.join('\n\n');
+}
+
+/**
  * A Quest's metadata, defined in its quest.ts.
  */
 export type QuestMetadata = {

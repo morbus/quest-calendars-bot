@@ -3,7 +3,7 @@
  */
 
 import { TRAITS, type Character } from './builder.ts';
-import type { Button, Component, TextDisplay } from './components.ts';
+import type { ActionRow, Button, Component, TextDisplay } from './components.ts';
 import type { Image, Loaded, Quest } from './registry.ts';
 import type { Storage } from './storage.ts';
 
@@ -79,18 +79,19 @@ export type Result = {
 };
 
 /**
- * Previous and Next buttons for item `index` of `count`, whose ids lead to the one before
- * and after it, wrapping around at either end. Both are disabled when there's only one.
- *
- * @remarks
- * Each id starts with its direction, so the two differ even when they lead to the same one.
+ * Browse a list of "Choose"-able items, with "Previous" and "Next" buttons that
+ * wraparound. If the list only contains item, "Previous" and "Next" aren't shown.
  */
-function browseButtons(list: string, index: number, count: number): [Button, Button] {
-	const disabled = count === 1;
-	return [
-		{ disabled, id: `prev:${list}:${(index - 1 + count) % count}`, label: 'Previous', type: 'button' },
-		{ disabled, id: `next:${list}:${(index + 1) % count}`, label: 'Next', type: 'button' },
-	];
+function browseRow(list: string, index: number, count: number, choose: Button): ActionRow {
+	if (count === 1) return { components: [choose], type: 'actionRow' };
+	return {
+		components: [
+			{ id: `prev:${list}:${(index - 1 + count) % count}`, label: 'Previous', type: 'button' },
+			choose,
+			{ id: `next:${list}:${(index + 1) % count}`, label: 'Next', type: 'button' },
+		],
+		type: 'actionRow',
+	};
 }
 
 /**
@@ -101,8 +102,7 @@ function capitalize(word: string): string {
 }
 
 /**
- * A Quest or Character on its own in a box: its image across the top, if it has one,
- * then its name as a heading over `description`, then `details`, and `position` in small text below a line.
+ * A Quest or Character on its own in a box.
  */
 function card(
 	{ image, name }: { image?: Image; name: string },
@@ -174,7 +174,6 @@ function pressButton(quests: Quest[], button: string): Reply {
  */
 function showCharacter(quest: Quest, index: number): Reply {
 	const character = quest.characters[index]!;
-	const [previous, next] = browseButtons(`characters:${quest.id}`, index, quest.characters.length);
 	const choose: Button = {
 		id: `character:${quest.id}:${character.id}`,
 		label: 'Choose this Character',
@@ -189,7 +188,7 @@ function showCharacter(quest: Quest, index: number): Reply {
 				characterDetails(character),
 				`Character ${index + 1} of ${quest.characters.length} in ${quest.name}`,
 			),
-			{ components: [previous, choose, next], type: 'actionRow' },
+			browseRow(`characters:${quest.id}`, index, quest.characters.length, choose),
 		],
 	};
 }
@@ -199,7 +198,6 @@ function showCharacter(quest: Quest, index: number): Reply {
  */
 function showQuest(quests: Quest[], index: number): Reply {
 	const quest = quests[index]!;
-	const [previous, next] = browseButtons('quests', index, quests.length);
 	const choose: Button = {
 		id: `quest:${quest.id}`,
 		label: 'Choose this Quest',
@@ -209,7 +207,7 @@ function showQuest(quests: Quest[], index: number): Reply {
 		components: [
 			text('Choose a Quest.'),
 			card(quest, quest.description, [], `Quest ${index + 1} of ${quests.length}`),
-			{ components: [previous, choose, next], type: 'actionRow' },
+			browseRow('quests', index, quests.length, choose),
 		],
 	};
 }
