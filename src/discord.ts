@@ -25,26 +25,6 @@ import { MAX_IMAGE_BYTES, type Image } from './registry.ts';
 import { logger } from './log.ts';
 
 /**
- * The most components Discord shows in one message, counting every part inside another and every button.
- */
-const MAX_COMPONENTS = 40;
-
-/**
- * The most files Discord attaches to one message.
- */
-const MAX_FILES = 10;
-
-/**
- * The most characters Discord shows in one message's texts, all together.
- */
-const MAX_TEXT_LENGTH = 4000;
-
-/**
- * Discord's size for each {@link Separator} spacing.
- */
-const SEPARATOR_SPACINGS = { large: SeparatorSpacingSize.Large, small: SeparatorSpacingSize.Small };
-
-/**
  * Discord's color for each {@link Button} style.
  */
 const BUTTON_STYLES = {
@@ -70,29 +50,78 @@ const COMMANDS = [
 );
 
 /**
- * Logs in to Discord, registers the slash commands, and hands every slash command and button press to the Game.
- *
- * @throws When the login fails.
+ * The most components Discord shows in one message, counting every part inside another and every button.
  */
-export async function startBot({ game, token }: { game: Game; token: string }): Promise<Client> {
-	const client = new Client({ intents: [] });
+const MAX_COMPONENTS = 40;
 
-	client.once(Events.ClientReady, async (ready) => {
-		logger.info('Logged in to Discord', { as: ready.user.tag });
-		try {
-			await ready.application.commands.set(COMMANDS);
-			logger.info('Registered global commands', { commands: COMMANDS.map((command) => `/${command.name}`) });
-		} catch (error) {
-			logger.error('Could not register global commands', error);
-		}
-	});
-	client.on(Events.Error, (error) => logger.error('Discord client error', error));
-	client.on(Events.InteractionCreate, async (interaction) => {
-		if (interaction.isChatInputCommand() || interaction.isButton()) await handle(interaction, game);
-	});
+/**
+ * The most files Discord attaches to one message.
+ */
+const MAX_FILES = 10;
 
-	await client.login(token);
-	return client;
+/**
+ * The most characters Discord shows in one message's texts, all together.
+ */
+const MAX_TEXT_LENGTH = 4000;
+
+/**
+ * Discord's size for each {@link Separator} spacing.
+ */
+const SEPARATOR_SPACINGS = { large: SeparatorSpacingSize.Large, small: SeparatorSpacingSize.Small };
+
+/**
+ * Anything Discord counts as a component.
+ */
+type Part = Component | Button | LinkButton | Thumbnail;
+
+/**
+ * A name for each of `images` that Discord can link to: anything but letters, digits, `.`, `-`, and `_`
+ * becomes `_`, and a name already taken by another image gets a number in front, such as "2-map.png".
+ */
+function attachmentNames(images: Image[]): Map<Image, string> {
+	const names = new Map<Image, string>();
+	const taken = new Set<string>();
+	for (const image of images) {
+		const base = image.name.replace(/[^\w.-]/gu, '_');
+		let name = base;
+		for (let n = 2; taken.has(name); n++) name = `${n}-${base}`;
+		taken.add(name);
+		names.set(image, name);
+	}
+	return names;
+}
+
+/**
+ * Each of Discord's limits on one message that `reply` breaks, described for an author or a log.
+ */
+export function brokenLimits({ components }: Reply): string[] {
+	const images = imagesIn(components);
+	const bytes = images.reduce((total, image) => total + image.data.length, 0);
+	const n = (count: number) => count.toLocaleString('en-US');
+	return [
+		textLength(components) > MAX_TEXT_LENGTH &&
+			`${n(textLength(components))} characters of text, more than the ${n(MAX_TEXT_LENGTH)} Discord shows in one message`,
+		count(components) > MAX_COMPONENTS &&
+			`${n(count(components))} components, more than the ${n(MAX_COMPONENTS)} Discord shows in one message`,
+		images.length > MAX_FILES &&
+			`${n(images.length)} images, more than the ${n(MAX_FILES)} Discord attaches to one message`,
+		bytes > MAX_IMAGE_BYTES &&
+			`images of ${n(bytes)} bytes together, more than the ${n(MAX_IMAGE_BYTES)} Discord attaches to one message`,
+	].filter((problem) => problem !== false);
+}
+
+/**
+ * The slash command's name with its subcommand, such as "quest start".
+ */
+function commandName(interaction: ChatInputCommandInteraction): string {
+	return [interaction.commandName, interaction.options.getSubcommand(false)].filter(Boolean).join(' ');
+}
+
+/**
+ * How many components Discord counts in `parts`.
+ */
+function count(parts: Component[]): number {
+	return partsIn(parts).length;
 }
 
 /**
@@ -137,43 +166,16 @@ async function handle(interaction: ChatInputCommandInteraction | ButtonInteracti
 }
 
 /**
- * The slash command's name with its subcommand, such as "quest start".
+ * Every image `parts` show, each once.
  */
-function commandName(interaction: ChatInputCommandInteraction): string {
-	return [interaction.commandName, interaction.options.getSubcommand(false)].filter(Boolean).join(' ');
-}
-
-/**
- * Turns a slash command, such as "quest start", into the Game's {@link Input}.
- *
- * @throws When it isn't a command the bot registers.
- */
-function toInput(command: string): Input {
-	switch (command) {
-		case 'quest start':
-			return { command: 'quest start' };
-		default:
-			throw new Error(`Unknown command /${command}`);
-	}
-}
-
-/**
- * Each of Discord's limits on one message that `reply` breaks, described for an author or a log.
- */
-export function brokenLimits({ components }: Reply): string[] {
-	const images = imagesIn(components);
-	const bytes = images.reduce((total, image) => total + image.data.length, 0);
-	const n = (count: number) => count.toLocaleString('en-US');
-	return [
-		textLength(components) > MAX_TEXT_LENGTH &&
-			`${n(textLength(components))} characters of text, more than the ${n(MAX_TEXT_LENGTH)} Discord shows in one message`,
-		count(components) > MAX_COMPONENTS &&
-			`${n(count(components))} components, more than the ${n(MAX_COMPONENTS)} Discord shows in one message`,
-		images.length > MAX_FILES &&
-			`${n(images.length)} images, more than the ${n(MAX_FILES)} Discord attaches to one message`,
-		bytes > MAX_IMAGE_BYTES &&
-			`images of ${n(bytes)} bytes together, more than the ${n(MAX_IMAGE_BYTES)} Discord attaches to one message`,
-	].filter((problem) => problem !== false);
+function imagesIn(parts: Component[]): Image[] {
+	const images = partsIn(parts).flatMap((part) => {
+		if (part.type === 'file') return [part.file];
+		if (part.type === 'mediaGallery') return part.items.map(({ media }) => media);
+		if (part.type === 'thumbnail') return [part.media];
+		return [];
+	});
+	return [...new Set(images)];
 }
 
 /**
@@ -188,23 +190,37 @@ function partsIn(parts: Part[]): Part[] {
 }
 
 /**
- * Anything Discord counts as a component.
+ * Logs in to Discord, registers the slash commands, and hands every slash command and button press to the Game.
+ *
+ * @throws When the login fails.
  */
-type Part = Component | Button | LinkButton | Thumbnail;
+export async function startBot({ game, token }: { game: Game; token: string }): Promise<Client> {
+	const client = new Client({ intents: [] });
 
-/**
- * How many components Discord counts in `parts`.
- */
-function count(parts: Component[]): number {
-	return partsIn(parts).length;
+	client.once(Events.ClientReady, async (ready) => {
+		logger.info('Logged in to Discord', { as: ready.user.tag });
+		try {
+			await ready.application.commands.set(COMMANDS);
+			logger.info('Registered global commands', { commands: COMMANDS.map((command) => `/${command.name}`) });
+		} catch (error) {
+			logger.error('Could not register global commands', error);
+		}
+	});
+	client.on(Events.Error, (error) => logger.error('Discord client error', error));
+	client.on(Events.InteractionCreate, async (interaction) => {
+		if (interaction.isChatInputCommand() || interaction.isButton()) await handle(interaction, game);
+	});
+
+	await client.login(token);
+	return client;
 }
 
 /**
  * How many characters of text `parts` hold together: their texts, button labels, and image descriptions.
  *
  * @remarks
- * Discord's docs don't say whether labels and descriptions count toward {@link MAX_TEXT_LENGTH},
- * so they're counted, to be safe either way.
+ * Discord's docs don't say whether labels and descriptions count toward
+ * {@link MAX_TEXT_LENGTH}, so they're counted, to be safe either way.
  */
 function textLength(parts: Component[]): number {
 	return partsIn(parts)
@@ -219,20 +235,7 @@ function textLength(parts: Component[]): number {
 }
 
 /**
- * Every image `parts` show, each once.
- */
-function imagesIn(parts: Component[]): Image[] {
-	const images = partsIn(parts).flatMap((part) => {
-		if (part.type === 'file') return [part.file];
-		if (part.type === 'mediaGallery') return part.items.map(({ media }) => media);
-		if (part.type === 'thumbnail') return [part.media];
-		return [];
-	});
-	return [...new Set(images)];
-}
-
-/**
- * Builds a {@link Reply} as one Discord message in Components V2, attaching each image it shows once.
+ * Builds a {@link Reply} as one Discord message in Components, attaching each image it shows once.
  *
  * @throws When it breaks one of Discord's limits on a message, which startup checks every Quest's screens against.
  */
@@ -301,7 +304,6 @@ export function toDiscord(reply: Reply) {
 			: part(component);
 	return {
 		components: components.map(topLevel),
-		// Cleared, so this can replace a message the bot sent with text or embeds before it used Components V2.
 		content: null,
 		embeds: [],
 		files: [...names].map(([{ data }, name]) => ({ attachment: data, name })),
@@ -310,18 +312,15 @@ export function toDiscord(reply: Reply) {
 }
 
 /**
- * A name for each of `images` that Discord can link to: anything but letters, digits, `.`, `-`, and `_`
- * becomes `_`, and a name already taken by another image gets a number in front, such as "2-map.png".
+ * Turns a slash command, such as "quest start", into the Game's {@link Input}.
+ *
+ * @throws When it isn't a command the bot registers.
  */
-function attachmentNames(images: Image[]): Map<Image, string> {
-	const names = new Map<Image, string>();
-	const taken = new Set<string>();
-	for (const image of images) {
-		const base = image.name.replace(/[^\w.-]/gu, '_');
-		let name = base;
-		for (let n = 2; taken.has(name); n++) name = `${n}-${base}`;
-		taken.add(name);
-		names.set(image, name);
+function toInput(command: string): Input {
+	switch (command) {
+		case 'quest start':
+			return { command: 'quest start' };
+		default:
+			throw new Error(`Unknown command /${command}`);
 	}
-	return names;
 }

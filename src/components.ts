@@ -1,5 +1,5 @@
 /**
- * A Reply is made with Discord's Components v2, named and shaped as Discord does.
+ * A Reply is made with Discord's Components, named and shaped as Discord does.
  * The Game lays out every message from these, and the Discord adapter turns each
  * into its Discord counterpart one for one.
  *
