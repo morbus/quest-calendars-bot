@@ -44,13 +44,18 @@ _Avoid_: Camp, long rest, recovery.
 
 **Sheet**:
 The current state of one **Player**'s **Character** in one **Quest**: **Stats**,
-**Traits**, **Abilities**, **Currency**, equipment, items, and conditions.
+**Traits**, **Abilities**, **Currency**, **Reputation**, equipment, items, and conditions.
 _Avoid_: Character sheet, profile.
 
 **Currency**:
 The one kind of money a **Quest** uses, named by that **Quest**
 (gold, scrap), and can go negative only as debt from a required payment.
 _Avoid_: Coins, money.
+
+**Reputation**:
+How a **Quest**'s world sees the **Player**'s **Character**, from 0 to 20, named by that **Quest**
+(Notoriety, Virtue). It changes with decisions on **Pages**, and every **Quest** has one.
+_Avoid_: Meter.
 
 **Action**:
 One thing the **Player** does on a **Page**, usually a die roll plus

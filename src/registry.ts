@@ -194,6 +194,7 @@ function checkMetadata(value: unknown, file: string, questDir: string): Loaded<Q
 	checkText('description', metadata.description);
 	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
 	checkText('currency', metadata.currency);
+	checkText('reputation', metadata.reputation);
 	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
 	for (const [i, ruleModule] of metadata.ruleModules.entries()) {
 		if (!RULE_MODULES.includes(ruleModule)) throw new Error(`ruleModules has an unknown Rule Module: ${ruleModule}`);
@@ -201,12 +202,6 @@ function checkMetadata(value: unknown, file: string, questDir: string): Loaded<Q
 			throw new Error(`ruleModules turns on ${ruleModule} more than once`);
 		}
 	}
-	const hasMeter = metadata.ruleModules.includes('meter');
-	if (metadata.meter !== undefined) {
-		if (!hasMeter) throw new Error("meter is named, but ruleModules doesn't turn on meter");
-		checkText('meter', metadata.meter);
-	}
-	if (hasMeter && metadata.meter === undefined) throw new Error('ruleModules turns on meter, but meter has no name');
 	return withImage(metadata, file, questDir);
 }
 

@@ -1,15 +1,11 @@
 /**
- * The helpers authors write Quests with (ADR 0001).
- *
- * @remarks
- * Each Quest is a directory in quests/ holding a `quest.ts` that exports {@link quest} by default,
- * and a characters/ directory with one `.ts` file per Character that exports {@link character}.
+ * The types that authors write Quests with.
  */
 
 /**
  * The optional Rule Modules a Quest can turn on.
  */
-export const RULE_MODULES = ['exploration', 'meal-rations', 'meter'] as const;
+export const RULE_MODULES = ['crafting', 'meal-rations', 'minions'] as const;
 
 /**
  * One of the {@link RULE_MODULES}.
@@ -17,7 +13,7 @@ export const RULE_MODULES = ['exploration', 'meal-rations', 'meter'] as const;
 export type RuleModule = (typeof RULE_MODULES)[number];
 
 /**
- * A Quest's metadata, from its `quest.ts`.
+ * A Quest's metadata, defined in its `quests/QUEST_ID/quest.ts`.
  */
 export type QuestMetadata = {
 	/**
@@ -42,13 +38,13 @@ export type QuestMetadata = {
 	 */
 	image?: string;
 	/**
-	 * The name of the meter, such as "Notoriety", when the Quest turns on the meter Rule Module.
-	 */
-	meter?: string;
-	/**
 	 * The Quest's name, as Players see it.
 	 */
 	name: string;
+	/**
+	 * The name of the Quest's Reputation, such as "Notoriety" or "Virtue".
+	 */
+	reputation: string;
 	/**
 	 * The Rule Modules the Quest turns on.
 	 */

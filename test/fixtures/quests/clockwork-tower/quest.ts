@@ -6,7 +6,7 @@ export default quest({
 	description: 'Climb a tower of gears before it strikes midnight.',
 	id: 'clockwork-tower',
 	image: 'tower.png',
-	meter: 'Virtue',
 	name: 'The Clockwork Tower',
-	ruleModules: ['meter'],
+	reputation: 'Virtue',
+	ruleModules: ['crafting'],
 });

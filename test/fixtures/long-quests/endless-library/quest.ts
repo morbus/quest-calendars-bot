@@ -16,5 +16,6 @@ export default quest({
 	description: shelves.join('\n\n'),
 	id: 'endless-library',
 	name: 'The Endless Library',
+	reputation: 'Renown',
 	ruleModules: [],
 });

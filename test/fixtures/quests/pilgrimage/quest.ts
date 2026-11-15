@@ -6,5 +6,6 @@ export default quest({
 	description: 'A pilgrimage along the old trade road.',
 	id: 'amber-road',
 	name: 'The Amber Road',
+	reputation: 'Piety',
 	ruleModules: [],
 });

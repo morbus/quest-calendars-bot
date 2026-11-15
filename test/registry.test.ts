@@ -21,6 +21,7 @@ const METADATA: QuestMetadata = {
 	description: 'A pilgrimage along the old trade road.',
 	id: 'amber-road',
 	name: 'The Amber Road',
+	reputation: 'Piety',
 	ruleModules: [],
 };
 
@@ -81,8 +82,8 @@ test('each loaded Quest and Character remembers the file that declared it', asyn
 
 test('a Quest that turns on an unknown Rule Module fails to load', async () => {
 	await assert.rejects(
-		load([{ metadata: { ...METADATA, ruleModules: ['minions'] } }]),
-		/quest-1\/quest\.ts: ruleModules has an unknown Rule Module: minions/,
+		load([{ metadata: { ...METADATA, ruleModules: ['meter'] } }]),
+		/quest-1\/quest\.ts: ruleModules has an unknown Rule Module: meter/,
 	);
 });
 
@@ -119,20 +120,6 @@ test('a Character whose Damage is not a die fails to load', async () => {
 
 test('a Quest with no Characters fails to load', async () => {
 	await assert.rejects(load([{ characters: [] }]), /quest-1\/characters: has no Characters/);
-});
-
-test('a Quest that names a meter without turning on the meter Rule Module fails to load', async () => {
-	await assert.rejects(
-		load([{ metadata: { ...METADATA, meter: 'Virtue' } }]),
-		/quest-1\/quest\.ts: meter is named, but ruleModules doesn't turn on meter/,
-	);
-});
-
-test('a Quest that turns on the meter Rule Module without naming the meter fails to load', async () => {
-	await assert.rejects(
-		load([{ metadata: { ...METADATA, ruleModules: ['meter'] } }]),
-		/quest-1\/quest\.ts: ruleModules turns on meter, but meter has no name/,
-	);
 });
 
 test('a Quest whose id is not letters a–z and digits 0–9 with single hyphens fails to load', async () => {
@@ -251,13 +238,18 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	},
 	{
 		name: 'Rule Modules that are not a list',
-		quest: { metadata: { ...METADATA, ruleModules: 'meter' } },
-		error: /quest\.ts: ruleModules must be a list, not "meter"/,
+		quest: { metadata: { ...METADATA, ruleModules: 'minions' } },
+		error: /quest\.ts: ruleModules must be a list, not "minions"/,
 	},
 	{
-		name: 'an empty meter name',
-		quest: { metadata: { ...METADATA, meter: '', ruleModules: ['meter'] } },
-		error: /quest\.ts: meter must be text that isn't blank, not ""/,
+		name: 'a Quest with no Reputation',
+		quest: { metadata: { ...METADATA, reputation: undefined } },
+		error: /quest\.ts: reputation must be text that isn't blank, not undefined/,
+	},
+	{
+		name: 'an empty Reputation name',
+		quest: { metadata: { ...METADATA, reputation: '' } },
+		error: /quest\.ts: reputation must be text that isn't blank, not ""/,
 	},
 	{
 		name: 'a Character that is not an object',
@@ -348,8 +340,8 @@ const MALFORMED: { error: RegExp; name: string; quest: QuestFiles }[] = [
 	},
 	{
 		name: 'a Rule Module turned on twice',
-		quest: { metadata: { ...METADATA, meter: 'Virtue', ruleModules: ['meter', 'meter'] } },
-		error: /quest\.ts: ruleModules turns on meter more than once/,
+		quest: { metadata: { ...METADATA, ruleModules: ['minions', 'minions'] } },
+		error: /quest\.ts: ruleModules turns on minions more than once/,
 	},
 	{
 		name: 'a Quest name of only spaces',

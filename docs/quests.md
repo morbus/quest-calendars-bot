@@ -31,9 +31,9 @@ export default quest({
 	description: 'Climb a tower of gears before it strikes midnight.',
 	id: 'clockwork-tower',
 	image: 'tower.png',
-	meter: 'Virtue',
 	name: 'The Clockwork Tower',
-	ruleModules: ['meter'],
+	reputation: 'Virtue',
+	ruleModules: ['crafting'],
 });
 ```
 
@@ -42,11 +42,11 @@ export default quest({
 - `description`: what Players read before they choose the Quest.
 - `id`: letters a–z and digits 0–9, with single hyphens between them, such as `clockwork-tower`, at most 44 characters. Keep it once Players have played the Quest.
 - `image` (optional): see [Images](#images).
-- `meter`: the meter's name, such as "Notoriety". Give one exactly when `ruleModules` turns on `meter`.
 - `name`: what Players see, on one line of at most 80 characters.
-- `ruleModules`: the optional Rule Modules the Quest turns on, each at most once: `exploration`, `meal-rations`, and `meter`. Use `[]` for none.
+- `reputation`: what the Quest's Reputation is called, such as "Notoriety" or "Virtue".
+- `ruleModules`: the optional Rule Modules the Quest turns on, each at most once: `crafting`, `meal-rations`, and `minions`. Use `[]` for none.
 
-Every text, such as a name, a description, or the `currency`, must hold more than spaces, tabs, or line breaks.
+Every text, such as a name, a description, the `currency`, or the `reputation`, must hold more than spaces, tabs, or line breaks.
 No two Quests may share an id or a name, even across the directories QUESTS_DIR lists.
 Each Quest's and each Character's screen must fit in one Discord message: at most 4,000 characters of text in all, counting its name, description, and, for a Character, Stats, Traits, and Abilities, as well as its button labels and image descriptions.
 The bot won't start while a screen is too long, and its error names the file and how many characters the screen has.
