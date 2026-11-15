@@ -3,6 +3,16 @@
  */
 
 /**
+ * The optional Rule Modules a Quest can turn on.
+ */
+export const RULE_MODULES = ['crafting', 'meal-rations', 'minions'] as const;
+
+/**
+ * The six Traits, in the order Players see them.
+ */
+export const TRAITS = ['strength', 'dexterity', 'constitution', 'intellect', 'wisdom', 'charisma'] as const;
+
+/**
  * One of a Character's Abilities.
  */
 export type Ability = {
@@ -59,38 +69,6 @@ export type Character = {
 };
 
 /**
- * Declares a Character, as the default export of its file in characters/.
- */
-export function character(character: Character): Character {
-	return character;
-}
-
-/**
- * Turns a template written across many lines into paragraphs for a Player to read.
- *
- * @remarks
- * A line break becomes a space, and a blank line starts a new paragraph.
- * The indentation and the blank lines around the text are dropped.
- *
- * @example
- * ```ts
- * description: prose`
- *     Climb a tower of gears
- *     before it strikes midnight.
- *
- *     Somewhere above, a bell waits.
- * `,
- * ```
- */
-export function prose(strings: TemplateStringsArray, ...values: unknown[]): string {
-	return String.raw({ raw: strings }, ...values)
-		.split(/\n\s*\n/)
-		.map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
-		.filter((paragraph) => paragraph !== '')
-		.join('\n\n');
-}
-
-/**
  * A Quest's metadata, defined in its quest.ts.
  */
 export type QuestMetadata = {
@@ -137,18 +115,6 @@ export type QuestMetadata = {
 };
 
 /**
- * Declares a Quest's metadata, as the default export of its `quest.ts`.
- */
-export function quest(metadata: QuestMetadata): QuestMetadata {
-	return metadata;
-}
-
-/**
- * The optional Rule Modules a Quest can turn on.
- */
-export const RULE_MODULES = ['crafting', 'meal-rations', 'minions'] as const;
-
-/**
  * One of the {@link RULE_MODULES}.
  */
 export type RuleModule = (typeof RULE_MODULES)[number];
@@ -179,11 +145,45 @@ export type Stats = {
 };
 
 /**
- * The six Traits, in the order Players see them.
- */
-export const TRAITS = ['strength', 'dexterity', 'constitution', 'intellect', 'wisdom', 'charisma'] as const;
-
-/**
  * A Character's starting Traits.
  */
 export type Traits = Record<(typeof TRAITS)[number], number>;
+
+/**
+ * Declares a Character, as the default export of its file in characters/.
+ */
+export function character(character: Character): Character {
+	return character;
+}
+
+/**
+ * Turns a template written across many lines into paragraphs for a Player to read.
+ *
+ * @remarks
+ * A line break becomes a space, and a blank line starts a new paragraph.
+ * The indentation and the blank lines around the text are dropped.
+ *
+ * @example
+ * ```ts
+ * description: prose`
+ *     Climb a tower of gears
+ *     before it strikes midnight.
+ *
+ *     Somewhere above, a bell waits.
+ * `,
+ * ```
+ */
+export function prose(strings: TemplateStringsArray, ...values: unknown[]): string {
+	return String.raw({ raw: strings }, ...values)
+		.split(/\n\s*\n/)
+		.map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+		.filter((paragraph) => paragraph !== '')
+		.join('\n\n');
+}
+
+/**
+ * Declares a Quest's metadata, as the default export of its `quest.ts`.
+ */
+export function quest(metadata: QuestMetadata): QuestMetadata {
+	return metadata;
+}

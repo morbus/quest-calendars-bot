@@ -8,34 +8,6 @@ import type { Image, Loaded, Quest } from './registry.ts';
 import type { Storage } from './storage.ts';
 
 /**
- * Creates the Game.
- *
- * @param quests - Every loaded Quest.
- * @param storage - Holds every Player's Quests and Sheets.
- */
-export function createGame({ quests, storage }: { quests: Quest[]; storage: Storage }): Game {
-	return {
-		handle(_playerId, _serverId, input, _now) {
-			return storage.transaction(() => {
-				if ('command' in input) return { reply: showQuest(quests, 0) };
-				return { reply: pressButton(quests, input.button) };
-			});
-		},
-	};
-}
-
-/**
- * Every screen of every Quest and Character, as Players see it, with the file
- * that declared what it shows, so startup can check each fits on Discord.
- */
-export function everyScreen(quests: Quest[]): { file: string; reply: Reply }[] {
-	return quests.flatMap((quest, index) => [
-		{ file: quest.file, reply: showQuest(quests, index) },
-		...quest.characters.map((character, i) => ({ file: character.file, reply: showCharacter(quest, i) })),
-	]);
-}
-
-/**
  * The game rules, with no knowledge of Discord.
  */
 export type Game = {
@@ -134,6 +106,34 @@ function characterDetails({ abilities, stats, traits }: Loaded<Character>): Text
 		text(`**Traits**\n${TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ')}`),
 		text(`**Abilities**\n${abilityLines.length === 0 ? 'none' : abilityLines.join('\n')}`),
 	];
+}
+
+/**
+ * Creates the Game.
+ *
+ * @param quests - Every loaded Quest.
+ * @param storage - Holds every Player's Quests and Sheets.
+ */
+export function createGame({ quests, storage }: { quests: Quest[]; storage: Storage }): Game {
+	return {
+		handle(_playerId, _serverId, input, _now) {
+			return storage.transaction(() => {
+				if ('command' in input) return { reply: showQuest(quests, 0) };
+				return { reply: pressButton(quests, input.button) };
+			});
+		},
+	};
+}
+
+/**
+ * Every screen of every Quest and Character, as Players see it, with the file
+ * that declared what it shows, so startup can check each fits on Discord.
+ */
+export function everyScreen(quests: Quest[]): { file: string; reply: Reply }[] {
+	return quests.flatMap((quest, index) => [
+		{ file: quest.file, reply: showQuest(quests, index) },
+		...quest.characters.map((character, i) => ({ file: character.file, reply: showCharacter(quest, i) })),
+	]);
 }
 
 /**

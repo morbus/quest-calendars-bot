@@ -9,9 +9,19 @@ import { pathToFileURL } from 'node:url';
 import { RULE_MODULES, TRAITS, type Character, type QuestMetadata } from './builder.ts';
 
 /**
+ * Dice to roll, such as "d6" or "2d4".
+ */
+const DICE = /^([1-9]\d*)?d[1-9]\d*$/;
+
+/**
  * A Quest or Character id, such as "clockwork-tower".
  */
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/**
+ * The image files Discord shows in a message.
+ */
+const IMAGE_EXTENSIONS = ['.gif', '.jpeg', '.jpg', '.png', '.webp'];
 
 /**
  * The longest id, which keeps the button ids made from it within Discord's 100 characters,
@@ -20,19 +30,28 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const MAX_ID_LENGTH = 44;
 
 /**
+ * The most bytes of images Discord takes in one message, and so the largest image.
+ */
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/**
  * The longest Quest or Character name, short enough to show on one line as a heading and in the small text below it.
  */
 const MAX_NAME_LENGTH = 80;
 
 /**
- * The image files Discord shows in a message.
+ * The ids and names of Quests, or of one Quest's Characters, each with the file that declared it.
  */
-const IMAGE_EXTENSIONS = ['.gif', '.jpeg', '.jpg', '.png', '.webp'];
-
-/**
- * Dice to roll, such as "d6" or "2d4".
- */
-const DICE = /^([1-9]\d*)?d[1-9]\d*$/;
+type Claims = {
+	/**
+	 * The file that declared each id.
+	 */
+	ids: Map<string, string>;
+	/**
+	 * The file that declared each name.
+	 */
+	names: Map<string, string>;
+};
 
 /**
  * An image, read when the bot starts.
@@ -47,11 +66,6 @@ export type Image = {
 	 */
 	name: string;
 };
-
-/**
- * The most bytes of images Discord takes in one message, and so the largest image.
- */
-export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 /**
  * Quest metadata or a Character as loaded, with its image read in place of the authored path.
@@ -76,6 +90,162 @@ export type Quest = Loaded<QuestMetadata> & {
 	 */
 	characters: Loaded<Character>[];
 };
+
+/**
+ * Orders Quests or Characters by name.
+ */
+function byName(a: { name: string }, b: { name: string }): number {
+	return a.name.localeCompare(b.name);
+}
+
+/**
+ * Accepts a valid Character from `file`, in `questDir`, with its image read.
+ *
+ * @throws When it isn't.
+ */
+function checkCharacter(value: unknown, file: string, questDir: string): Loaded<Character> {
+	checkObject('the default export', value);
+	const character = value as Character;
+	checkId(character.id);
+	checkName(character.name);
+	checkText('description', character.description);
+	checkObject('stats', character.stats);
+	const { attack, damage, defense, maxHealth } = character.stats;
+	if (typeof damage !== 'string' || !DICE.test(damage)) fail('stats.damage', 'dice, such as d6 or 2d4', damage);
+	if (!Number.isInteger(maxHealth) || maxHealth < 1) fail('stats.maxHealth', 'a whole number of at least 1', maxHealth);
+	checkWholeNumber('stats.attack', attack);
+	checkWholeNumber('stats.defense', defense);
+	checkObject('traits', character.traits);
+	for (const trait of TRAITS) checkWholeNumber(`traits.${trait}`, character.traits[trait]);
+	if (!Array.isArray(character.abilities)) fail('abilities', 'a list', character.abilities);
+	for (const [i, ability] of character.abilities.entries()) {
+		checkObject(`abilities[${i}]`, ability);
+		checkText(`abilities[${i}].name`, ability.name);
+		checkText(`abilities[${i}].text`, ability.text);
+	}
+	return withImage(character, file, questDir);
+}
+
+/**
+ * Accepts a Quest or Character id.
+ *
+ * @throws When it isn't letters a–z and digits 0–9 with single hyphens between them, or is too long.
+ */
+function checkId(id: unknown): void {
+	if (typeof id !== 'string' || !ID.test(id)) {
+		fail('id', 'letters a–z and digits 0–9, with single hyphens between them', id);
+	}
+	if (id.length > MAX_ID_LENGTH) fail('id', `at most ${MAX_ID_LENGTH} characters`, id);
+}
+
+/**
+ * Accepts valid Quest metadata from `file`, in `questDir`, with its image read.
+ *
+ * @throws When it isn't.
+ */
+function checkMetadata(value: unknown, file: string, questDir: string): Loaded<QuestMetadata> {
+	checkObject('the default export', value);
+	const metadata = value as QuestMetadata;
+	checkId(metadata.id);
+	checkName(metadata.name);
+	checkText('description', metadata.description);
+	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
+	checkText('currency', metadata.currency);
+	checkText('reputation', metadata.reputation);
+	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
+	for (const [i, ruleModule] of metadata.ruleModules.entries()) {
+		if (!RULE_MODULES.includes(ruleModule)) throw new Error(`ruleModules has an unknown Rule Module: ${ruleModule}`);
+		if (metadata.ruleModules.indexOf(ruleModule) !== i) {
+			throw new Error(`ruleModules turns on ${ruleModule} more than once`);
+		}
+	}
+	return withImage(metadata, file, questDir);
+}
+
+/**
+ * Accepts a Quest or Character name, which Players see as a heading and in the small text below it.
+ *
+ * @throws When it isn't one line of text of at most {@link MAX_NAME_LENGTH} characters.
+ */
+function checkName(name: unknown): void {
+	checkText('name', name, MAX_NAME_LENGTH);
+	if (/[\r\n]/.test(name as string)) fail('name', 'one line', name);
+}
+
+/**
+ * Accepts an object, such as the Stats.
+ *
+ * @throws When `value`, at `field`, isn't one.
+ */
+function checkObject(field: string, value: unknown): void {
+	if (typeof value !== 'object' || value === null) fail(field, 'an object', value);
+}
+
+/**
+ * Accepts text that isn't blank, of at most `maxLength` characters if given.
+ *
+ * @throws When `value`, at `field`, isn't.
+ */
+function checkText(field: string, value: unknown, maxLength?: number): void {
+	const ok = typeof value === 'string' && value.trim().length > 0 && value.length <= (maxLength ?? value.length);
+	if (!ok) {
+		fail(field, `text${maxLength === undefined ? '' : ` of 1 to ${maxLength} characters`} that isn't blank`, value);
+	}
+}
+
+/**
+ * Accepts a whole number, such as a modifier.
+ *
+ * @throws When `value`, at `field`, isn't one.
+ */
+function checkWholeNumber(field: string, value: unknown): void {
+	if (!Number.isInteger(value)) fail(field, 'a whole number', value);
+}
+
+/**
+ * Records that `file` declares a Quest or Character with this `id` and `name`.
+ *
+ * @throws When an earlier file in `claims` declared the same id or name.
+ */
+function claim(claims: Claims, { id, name }: { id: string; name: string }, file: string): void {
+	for (const [field, claimed, value] of [
+		['id', claims.ids, id],
+		['name', claims.names, name],
+	] as const) {
+		const earlier = claimed.get(value);
+		if (earlier) throw new Error(`${file}: ${field} ${value} is already used by ${earlier}`);
+		claimed.set(value, file);
+	}
+}
+
+/**
+ * Rejects `value`, at `field`, for not being what was `expected`.
+ */
+function fail(field: string, expected: string, value: unknown): never {
+	// JSON shows NaN and Infinity as null, so numbers are shown as they are.
+	const shown = typeof value === 'number' ? String(value) : JSON.stringify(value);
+	throw new Error(`${field} must be ${expected}, not ${shown}`);
+}
+
+/**
+ * Whether `path` is outside the directory `dir`.
+ */
+function isOutside(dir: string, path: string): boolean {
+	return relative(dir, path).split(sep)[0] === '..';
+}
+
+/**
+ * Imports the `.ts` file at `file` and returns its default export, once `check` accepts it.
+ *
+ * @throws When the file can't be imported or `check` rejects it, naming the file.
+ */
+async function loadFile<T>(file: string, check: (value: unknown) => T): Promise<T> {
+	try {
+		return check((await import(pathToFileURL(file).href)).default);
+	} catch (error) {
+		throw new Error(`${file}: ${error instanceof Error ? error.message : error}`, { cause: error });
+	}
+}
 
 /**
  * Loads every Quest directory in each of `dirs`, sorted by name.
@@ -126,112 +296,10 @@ async function loadQuestsIn(dir: string, claims: Claims): Promise<Quest[]> {
 }
 
 /**
- * Orders Quests or Characters by name.
- */
-function byName(a: { name: string }, b: { name: string }): number {
-	return a.name.localeCompare(b.name);
-}
-
-/**
- * The ids and names of Quests, or of one Quest's Characters, each with the file that declared it.
- */
-type Claims = {
-	/**
-	 * The file that declared each id.
-	 */
-	ids: Map<string, string>;
-	/**
-	 * The file that declared each name.
-	 */
-	names: Map<string, string>;
-};
-
-/**
  * {@link Claims} with nothing claimed yet.
  */
 function newClaims(): Claims {
 	return { ids: new Map(), names: new Map() };
-}
-
-/**
- * Records that `file` declares a Quest or Character with this `id` and `name`.
- *
- * @throws When an earlier file in `claims` declared the same id or name.
- */
-function claim(claims: Claims, { id, name }: { id: string; name: string }, file: string): void {
-	for (const [field, claimed, value] of [
-		['id', claims.ids, id],
-		['name', claims.names, name],
-	] as const) {
-		const earlier = claimed.get(value);
-		if (earlier) throw new Error(`${file}: ${field} ${value} is already used by ${earlier}`);
-		claimed.set(value, file);
-	}
-}
-
-/**
- * Imports the `.ts` file at `file` and returns its default export, once `check` accepts it.
- *
- * @throws When the file can't be imported or `check` rejects it, naming the file.
- */
-async function loadFile<T>(file: string, check: (value: unknown) => T): Promise<T> {
-	try {
-		return check((await import(pathToFileURL(file).href)).default);
-	} catch (error) {
-		throw new Error(`${file}: ${error instanceof Error ? error.message : error}`, { cause: error });
-	}
-}
-
-/**
- * Accepts valid Quest metadata from `file`, in `questDir`, with its image read.
- *
- * @throws When it isn't.
- */
-function checkMetadata(value: unknown, file: string, questDir: string): Loaded<QuestMetadata> {
-	checkObject('the default export', value);
-	const metadata = value as QuestMetadata;
-	checkId(metadata.id);
-	checkName(metadata.name);
-	checkText('description', metadata.description);
-	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
-	checkText('currency', metadata.currency);
-	checkText('reputation', metadata.reputation);
-	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
-	for (const [i, ruleModule] of metadata.ruleModules.entries()) {
-		if (!RULE_MODULES.includes(ruleModule)) throw new Error(`ruleModules has an unknown Rule Module: ${ruleModule}`);
-		if (metadata.ruleModules.indexOf(ruleModule) !== i) {
-			throw new Error(`ruleModules turns on ${ruleModule} more than once`);
-		}
-	}
-	return withImage(metadata, file, questDir);
-}
-
-/**
- * Accepts a valid Character from `file`, in `questDir`, with its image read.
- *
- * @throws When it isn't.
- */
-function checkCharacter(value: unknown, file: string, questDir: string): Loaded<Character> {
-	checkObject('the default export', value);
-	const character = value as Character;
-	checkId(character.id);
-	checkName(character.name);
-	checkText('description', character.description);
-	checkObject('stats', character.stats);
-	const { attack, damage, defense, maxHealth } = character.stats;
-	if (typeof damage !== 'string' || !DICE.test(damage)) fail('stats.damage', 'dice, such as d6 or 2d4', damage);
-	if (!Number.isInteger(maxHealth) || maxHealth < 1) fail('stats.maxHealth', 'a whole number of at least 1', maxHealth);
-	checkWholeNumber('stats.attack', attack);
-	checkWholeNumber('stats.defense', defense);
-	checkObject('traits', character.traits);
-	for (const trait of TRAITS) checkWholeNumber(`traits.${trait}`, character.traits[trait]);
-	if (!Array.isArray(character.abilities)) fail('abilities', 'a list', character.abilities);
-	for (const [i, ability] of character.abilities.entries()) {
-		checkObject(`abilities[${i}]`, ability);
-		checkText(`abilities[${i}].name`, ability.name);
-		checkText(`abilities[${i}].text`, ability.text);
-	}
-	return withImage(character, file, questDir);
 }
 
 /**
@@ -270,72 +338,4 @@ function withImage<T extends { image?: string }>(declared: T, file: string, ques
 	const data = readFileSync(realPath);
 	if (data.length > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
 	return { ...rest, file, image: { data, name: basename(path) } };
-}
-
-/**
- * Whether `path` is outside the directory `dir`.
- */
-function isOutside(dir: string, path: string): boolean {
-	return relative(dir, path).split(sep)[0] === '..';
-}
-
-/**
- * Accepts a Quest or Character id.
- *
- * @throws When it isn't letters a–z and digits 0–9 with single hyphens between them, or is too long.
- */
-function checkId(id: unknown): void {
-	if (typeof id !== 'string' || !ID.test(id)) {
-		fail('id', 'letters a–z and digits 0–9, with single hyphens between them', id);
-	}
-	if (id.length > MAX_ID_LENGTH) fail('id', `at most ${MAX_ID_LENGTH} characters`, id);
-}
-
-/**
- * Accepts a Quest or Character name, which Players see as a heading and in the small text below it.
- *
- * @throws When it isn't one line of text of at most {@link MAX_NAME_LENGTH} characters.
- */
-function checkName(name: unknown): void {
-	checkText('name', name, MAX_NAME_LENGTH);
-	if (/[\r\n]/.test(name as string)) fail('name', 'one line', name);
-}
-
-/**
- * Accepts text that isn't blank, of at most `maxLength` characters if given.
- *
- * @throws When `value`, at `field`, isn't.
- */
-function checkText(field: string, value: unknown, maxLength?: number): void {
-	const ok = typeof value === 'string' && value.trim().length > 0 && value.length <= (maxLength ?? value.length);
-	if (!ok) {
-		fail(field, `text${maxLength === undefined ? '' : ` of 1 to ${maxLength} characters`} that isn't blank`, value);
-	}
-}
-
-/**
- * Accepts a whole number, such as a modifier.
- *
- * @throws When `value`, at `field`, isn't one.
- */
-function checkWholeNumber(field: string, value: unknown): void {
-	if (!Number.isInteger(value)) fail(field, 'a whole number', value);
-}
-
-/**
- * Accepts an object, such as the Stats.
- *
- * @throws When `value`, at `field`, isn't one.
- */
-function checkObject(field: string, value: unknown): void {
-	if (typeof value !== 'object' || value === null) fail(field, 'an object', value);
-}
-
-/**
- * Rejects `value`, at `field`, for not being what was `expected`.
- */
-function fail(field: string, expected: string, value: unknown): never {
-	// JSON shows NaN and Infinity as null, so numbers are shown as they are.
-	const shown = typeof value === 'number' ? String(value) : JSON.stringify(value);
-	throw new Error(`${field} must be ${expected}, not ${shown}`);
 }
