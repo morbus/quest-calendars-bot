@@ -104,8 +104,7 @@ by that server's admins. A server with none chosen receives no **Announcements**
 A one-line, spoiler-free summary of a **Page**, written by its author for **Announcements**.
 
 **Rule Module**:
-An optional set of game mechanics, such as the Sunday Lottery, Minions, or Crafting, that
-a **Quest** turns on; the core rules, including **Currency**, apply to every **Quest**.
+An optional set of game mechanics, such as the Crafting or Minions,, that a **Quest** turns on.
 
 ## Relationships
 
