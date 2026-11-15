@@ -1,8 +1,8 @@
 import { prose, quest } from '../../src/builder.ts';
 
 export default quest({
-	id: 'adventures-of-sd-247',
-	name: 'Adventures of SD-247',
+	id: 'voidspark-chronicles-adventures-of-sd-247',
+	name: 'The Voidspark Chronicles: Adventures of SD-247',
 	image: 'quest.jpg',
 	description: prose`
 		Take on the role of SD-247, a ship drone aboard the Argyle, as it performs its
