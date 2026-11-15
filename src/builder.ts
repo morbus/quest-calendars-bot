@@ -28,7 +28,7 @@ export type Ability = {
 };
 
 /**
- * A Character, defined in its Quest's characters/ directory.
+ * A Character, one of those listed in its Quest's `characters`.
  */
 export type Character = {
 	/**
@@ -48,7 +48,7 @@ export type Character = {
 
 	/**
 	 * An image, such as a portrait: a .gif, .jpeg, .jpg, .png, or .webp
-	 * file of at most 8 MiB, at a path relative to the characters/ directory.
+	 * file of at most 8 MiB, at a path relative to the Quest's directory.
 	 */
 	image?: string;
 
@@ -69,9 +69,14 @@ export type Character = {
 };
 
 /**
- * A Quest's metadata, defined in its quest.ts.
+ * A Quest, defined in its quest.ts.
  */
-export type QuestMetadata = {
+export type Quest = {
+	/**
+	 * The Characters a Player can choose from, in the order Players see them.
+	 */
+	characters: Character[];
+
 	/**
 	 * Whether the author has marked the Quest complete.
 	 */
@@ -150,13 +155,6 @@ export type Stats = {
 export type Traits = Record<(typeof TRAITS)[number], number>;
 
 /**
- * Declares a Character, as the default export of its file in characters/.
- */
-export function character(character: Character): Character {
-	return character;
-}
-
-/**
  * Turns a template written across many lines into paragraphs for a Player to read.
  *
  * @remarks
@@ -182,8 +180,8 @@ export function prose(strings: TemplateStringsArray, ...values: unknown[]): stri
 }
 
 /**
- * Declares a Quest's metadata, as the default export of its `quest.ts`.
+ * Declares a Quest, as the default export of its `quest.ts`.
  */
-export function quest(metadata: QuestMetadata): QuestMetadata {
-	return metadata;
+export function quest(quest: Quest): Quest {
+	return quest;
 }

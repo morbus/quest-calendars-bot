@@ -4,7 +4,7 @@
 
 import { TRAITS, type Character } from './builder.ts';
 import type { ActionRow, Button, Component, TextDisplay } from './components.ts';
-import type { Image, Loaded, Quest } from './registry.ts';
+import type { Image, Loaded, LoadedQuest } from './registry.ts';
 import type { Storage } from './storage.ts';
 
 /**
@@ -114,7 +114,7 @@ function characterDetails({ abilities, stats, traits }: Loaded<Character>): Text
  * @param quests - Every loaded Quest.
  * @param storage - Holds every Player's Quests and Sheets.
  */
-export function createGame({ quests, storage }: { quests: Quest[]; storage: Storage }): Game {
+export function createGame({ quests, storage }: { quests: LoadedQuest[]; storage: Storage }): Game {
 	return {
 		handle(_playerId, _serverId, input, _now) {
 			return storage.transaction(() => {
@@ -126,13 +126,13 @@ export function createGame({ quests, storage }: { quests: Quest[]; storage: Stor
 }
 
 /**
- * Every screen of every Quest and Character, as Players see it, with the file
- * that declared what it shows, so startup can check each fits on Discord.
+ * Every screen of every Quest and Character, as Players see it, with where it is declared:
+ * the Quest's file, and a Character's place in `characters`, so startup can check each fits in Discord.
  */
-export function everyScreen(quests: Quest[]): { file: string; reply: Reply }[] {
+export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: string }[] {
 	return quests.flatMap((quest, index) => [
-		{ file: quest.file, reply: showQuest(quests, index) },
-		...quest.characters.map((character, i) => ({ file: character.file, reply: showCharacter(quest, i) })),
+		{ reply: showQuest(quests, index), source: quest.file },
+		...quest.characters.map((_, i) => ({ reply: showCharacter(quest, i), source: `${quest.file}: characters[${i}]` })),
 	]);
 }
 
@@ -141,10 +141,10 @@ export function everyScreen(quests: Quest[]): { file: string; reply: Reply }[] {
  *
  * @throws When no button has that id, such as one left from before the Quests changed.
  */
-function pressButton(quests: Quest[], button: string): Reply {
+function pressButton(quests: LoadedQuest[], button: string): Reply {
 	const [kind, ...args] = button.split(':');
 	const unknown = new Error(`Unknown button: ${button}`);
-	const questWithId = (id: string | undefined): Quest => {
+	const questWithId = (id: string | undefined): LoadedQuest => {
 		const quest = quests.find((quest) => quest.id === id);
 		if (quest === undefined) throw unknown;
 		return quest;
@@ -172,7 +172,7 @@ function pressButton(quests: Quest[], button: string): Reply {
  * Shows the Character at `index` in `quest` on its own, with their Stats, Traits, and Abilities,
  * and buttons to choose them or move to the others.
  */
-function showCharacter(quest: Quest, index: number): Reply {
+function showCharacter(quest: LoadedQuest, index: number): Reply {
 	const character = quest.characters[index]!;
 	const choose: Button = {
 		id: `character:${quest.id}:${character.id}`,
@@ -195,7 +195,7 @@ function showCharacter(quest: Quest, index: number): Reply {
 /**
  * Shows the Quest at `index` on its own, with buttons to choose it or move to the others.
  */
-function showQuest(quests: Quest[], index: number): Reply {
+function showQuest(quests: LoadedQuest[], index: number): Reply {
 	const quest = quests[index]!;
 	const choose: Button = {
 		id: `quest:${quest.id}`,

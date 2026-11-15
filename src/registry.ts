@@ -4,9 +4,9 @@
 
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { RULE_MODULES, TRAITS, type Character, type QuestMetadata } from './builder.ts';
+import { RULE_MODULES, TRAITS, type Character, type Quest } from './builder.ts';
 
 /**
  * Dice to roll, such as "d6" or "2d4".
@@ -70,14 +70,9 @@ export type Image = {
 };
 
 /**
- * Quest metadata or a Character as loaded, with its image read in place of the authored path.
+ * A Quest or a Character as loaded, with its image read in place of the authored path.
  */
 export type Loaded<T extends { image?: string }> = Omit<T, 'image'> & {
-	/**
-	 * The file that declared it, such as a Quest's `quest.ts`, to name in errors.
-	 */
-	file: string;
-
 	/**
 	 * The image to show with it, if any.
 	 */
@@ -85,13 +80,18 @@ export type Loaded<T extends { image?: string }> = Omit<T, 'image'> & {
 };
 
 /**
- * A loaded Quest: its metadata and its Characters.
+ * A Quest as loaded: its Characters, in the order listed, and itself, each with its image read.
  */
-export type Quest = Loaded<QuestMetadata> & {
+export type LoadedQuest = Omit<Loaded<Quest>, 'characters'> & {
 	/**
-	 * The Quest's Characters, sorted by name.
+	 * The Quest's Characters, in the order Players see them.
 	 */
 	characters: Loaded<Character>[];
+
+	/**
+	 * The `quest.ts` that declared it, to name in errors.
+	 */
+	file: string;
 };
 
 /**
@@ -102,13 +102,11 @@ function byName(a: { name: string }, b: { name: string }): number {
 }
 
 /**
- * Accepts a valid Character from `file`, in `questDir`, with its image read.
+ * Accepts a valid Character, in the Quest at `questDir`, with its image read.
  *
  * @throws When it isn't.
  */
-function checkCharacter(value: unknown, file: string, questDir: string): Loaded<Character> {
-	checkObject('the default export', value);
-	const character = value as Character;
+function checkCharacter(character: Character, questDir: string): Loaded<Character> {
 	checkId(character.id);
 	checkName(character.name);
 	checkText('description', character.description);
@@ -126,7 +124,7 @@ function checkCharacter(value: unknown, file: string, questDir: string): Loaded<
 		checkText(`abilities[${i}].name`, ability.name);
 		checkText(`abilities[${i}].text`, ability.text);
 	}
-	return withImage(character, file, questDir);
+	return withImage(character, questDir);
 }
 
 /**
@@ -142,27 +140,42 @@ function checkId(id: unknown): void {
 }
 
 /**
- * Accepts valid Quest metadata from `file`, in `questDir`, with its image read.
+ * Accepts a valid Quest, in `questDir`, with its image and its Characters' images read.
  *
- * @throws When it isn't.
+ * @throws When it isn't, naming a Character's place in `characters` when the problem is with one.
  */
-function checkMetadata(value: unknown, file: string, questDir: string): Loaded<QuestMetadata> {
+function checkQuest(value: unknown, questDir: string): Omit<LoadedQuest, 'file'> {
 	checkObject('the default export', value);
-	const metadata = value as QuestMetadata;
-	checkId(metadata.id);
-	checkName(metadata.name);
-	checkText('description', metadata.description);
-	if (typeof metadata.complete !== 'boolean') fail('complete', 'true or false', metadata.complete);
-	checkText('currency', metadata.currency);
-	checkText('reputation', metadata.reputation);
-	if (!Array.isArray(metadata.ruleModules)) fail('ruleModules', 'a list', metadata.ruleModules);
-	for (const [i, ruleModule] of metadata.ruleModules.entries()) {
+	const quest = value as Quest;
+	checkId(quest.id);
+	checkName(quest.name);
+	checkText('description', quest.description);
+	if (typeof quest.complete !== 'boolean') fail('complete', 'true or false', quest.complete);
+	checkText('currency', quest.currency);
+	checkText('reputation', quest.reputation);
+	if (!Array.isArray(quest.ruleModules)) fail('ruleModules', 'a list', quest.ruleModules);
+	for (const [i, ruleModule] of quest.ruleModules.entries()) {
 		if (!RULE_MODULES.includes(ruleModule)) throw new Error(`ruleModules has an unknown Rule Module: ${ruleModule}`);
-		if (metadata.ruleModules.indexOf(ruleModule) !== i) {
+		if (quest.ruleModules.indexOf(ruleModule) !== i) {
 			throw new Error(`ruleModules turns on ${ruleModule} more than once`);
 		}
 	}
-	return withImage(metadata, file, questDir);
+	if (!Array.isArray(quest.characters) || quest.characters.length === 0) {
+		fail('characters', 'a list of at least one Character', quest.characters);
+	}
+	const claims = newClaims();
+	const characters = quest.characters.map((character, i) => {
+		const place = `characters[${i}]`;
+		checkObject(place, character);
+		try {
+			const loaded = checkCharacter(character, questDir);
+			claim(claims, loaded, place);
+			return loaded;
+		} catch (error) {
+			throw new Error(`${place}.${error instanceof Error ? error.message : error}`, { cause: error });
+		}
+	});
+	return { ...withImage(quest, questDir), characters };
 }
 
 /**
@@ -206,18 +219,18 @@ function checkWholeNumber(field: string, value: unknown): void {
 }
 
 /**
- * Records that `file` declares a Quest or Character with this `id` and `name`.
+ * Records that `place`, such as a Quest's file or a Character's place in its Quest, declares this `id` and `name`.
  *
- * @throws When an earlier file in `claims` declared the same id or name.
+ * @throws When an earlier place in `claims` declared the same id or name.
  */
-function claim(claims: Claims, { id, name }: { id: string; name: string }, file: string): void {
+function claim(claims: Claims, { id, name }: { id: string; name: string }, place: string): void {
 	for (const [field, claimed, value] of [
 		['id', claims.ids, id],
 		['name', claims.names, name],
 	] as const) {
 		const earlier = claimed.get(value);
-		if (earlier) throw new Error(`${file}: ${field} ${value} is already used by ${earlier}`);
-		claimed.set(value, file);
+		if (earlier) throw new Error(`${field} ${value} is already used by ${earlier}`);
+		claimed.set(value, place);
 	}
 }
 
@@ -255,8 +268,8 @@ async function loadFile<T>(file: string, check: (value: unknown) => T): Promise<
  *
  * @throws When a Quest is invalid, naming the file at fault and the problem, or when there are no Quests.
  */
-export async function loadQuests(dirs: string[]): Promise<Quest[]> {
-	const quests: Quest[] = [];
+export async function loadQuests(dirs: string[]): Promise<LoadedQuest[]> {
+	const quests: LoadedQuest[] = [];
 	const claims = newClaims();
 	for (const dir of dirs) {
 		quests.push(...(await loadQuestsIn(dir, claims)));
@@ -270,30 +283,19 @@ export async function loadQuests(dirs: string[]): Promise<Quest[]> {
  *
  * @throws When a Quest is invalid, naming the file at fault and the problem.
  */
-async function loadQuestsIn(dir: string, claims: Claims): Promise<Quest[]> {
-	const quests: Quest[] = [];
+async function loadQuestsIn(dir: string, claims: Claims): Promise<LoadedQuest[]> {
+	const quests: LoadedQuest[] = [];
 	for (const entry of await readdir(dir)) {
 		const questDir = join(dir, entry);
 		// stat() follows a symbolic link, so a linked Quest directory loads too.
 		if (entry.startsWith('.') || !(await stat(questDir)).isDirectory()) continue;
-		const metadataFile = join(questDir, 'quest.ts');
-		const metadata = await loadFile(metadataFile, (value) => checkMetadata(value, metadataFile, questDir));
-		claim(claims, metadata, metadataFile);
-		const characters: Loaded<Character>[] = [];
-		const characterClaims = newClaims();
-		const characterFiles = await readdir(join(questDir, 'characters')).catch((error) => {
-			if (error.code === 'ENOENT') return [];
-			throw error;
+		const file = join(questDir, 'quest.ts');
+		const quest = await loadFile(file, (value) => {
+			const checked = checkQuest(value, questDir);
+			claim(claims, checked, file);
+			return checked;
 		});
-		for (const name of characterFiles) {
-			if (name.startsWith('.') || !name.endsWith('.ts')) continue;
-			const file = join(questDir, 'characters', name);
-			const character = await loadFile(file, (value) => checkCharacter(value, file, questDir));
-			claim(characterClaims, character, file);
-			characters.push(character);
-		}
-		if (characters.length === 0) throw new Error(`${join(questDir, 'characters')}: has no Characters`);
-		quests.push({ ...metadata, characters: characters.sort(byName) });
+		quests.push({ ...quest, file });
 	}
 	return quests;
 }
@@ -306,19 +308,18 @@ function newClaims(): Claims {
 }
 
 /**
- * `declared`, as declared in `file`, with its image, if any, read from its path relative to
- * `file`, which must stay in `questDir`. Reading it now means a reply still shows it if the
- * file moves while the bot runs.
+ * `declared`, with its image, if any, read from its path relative to `questDir`, which it must
+ * stay in. Reading it now means a reply still shows it if the file moves while the bot runs.
  *
  * @throws When the image isn't an image file, is outside `questDir`, doesn't exist, or is too large for Discord.
  */
-function withImage<T extends { image?: string }>(declared: T, file: string, questDir: string): Loaded<T> {
+function withImage<T extends { image?: string }>(declared: T, questDir: string): Loaded<T> {
 	const { image, ...rest } = declared;
-	if (image === undefined) return { ...rest, file };
+	if (image === undefined) return rest;
 	if (typeof image !== 'string' || !IMAGE_EXTENSIONS.includes(extname(image).toLowerCase())) {
 		fail('image', `a ${IMAGE_EXTENSIONS.slice(0, -1).join(', ')}, or ${IMAGE_EXTENSIONS.at(-1)} file`, image);
 	}
-	const path = resolve(dirname(file), image);
+	const path = resolve(questDir, image);
 	// A Quest is self-contained: its images stay in its directory, wherever that directory is.
 	if (isAbsolute(image) || isOutside(questDir, path)) {
 		fail('image', "a path relative to this file, inside its Quest's directory", image);
@@ -338,5 +339,5 @@ function withImage<T extends { image?: string }>(declared: T, file: string, ques
 	if (statSync(realPath).size > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
 	const data = readFileSync(realPath);
 	if (data.length > MAX_IMAGE_BYTES) fail('image', maxSizeRule, image);
-	return { ...rest, file, image: { data, name: basename(path) } };
+	return { ...rest, image: { data, name: basename(path) } };
 }

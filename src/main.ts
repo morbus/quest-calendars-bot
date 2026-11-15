@@ -87,8 +87,8 @@ async function main(): Promise<void> {
 	logger.info('Loaded Quests', { quests: quests.map((quest) => quest.name) });
 
 	// Authors shorten what doesn't fit, rather than Players seeing it cut short.
-	const unshowable = everyScreen(quests).flatMap(({ file, reply }) =>
-		brokenLimits(reply).map((problem) => `${file}: its screen has ${problem}`),
+	const unshowable = everyScreen(quests).flatMap(({ reply, source }) =>
+		brokenLimits(reply).map((problem) => `${source}: its screen has ${problem}`),
 	);
 	if (unshowable.length > 0) {
 		for (const problem of unshowable) logger.error(`Quest can't be shown in Discord: ${problem}`);

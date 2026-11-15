@@ -97,7 +97,7 @@ test('startup fails, naming the file, when a Quest in any QUESTS_DIR directory i
 	);
 });
 
-test("startup fails, naming each file, when a Quest's or Character's screen has more text than Discord shows", async () => {
+test("startup fails, naming where each is declared, when a Quest's or Character's screen has more text than Discord shows", async () => {
 	const { code, output } = await start({
 		DISCORD_TOKEN: 'token',
 		GAME_TIMEZONE: 'UTC',
@@ -105,11 +105,11 @@ test("startup fails, naming each file, when a Quest's or Character's screen has 
 	});
 
 	assert.equal(code, 1);
-	for (const file of ['quest.ts', 'characters/archivist.ts', 'characters/reader.ts']) {
+	for (const source of ['quest\\.ts', 'quest\\.ts: characters\\[0\\]', 'quest\\.ts: characters\\[1\\]']) {
 		assert.match(
 			output,
 			new RegExp(
-				`Quest can't be shown in Discord: \\S*endless-library/${file.replace('.', '\\.')}: its screen has [\\d,]+ characters of text, more than the 4,000 Discord shows in one message`,
+				`Quest can't be shown in Discord: \\S*endless-library/${source}: its screen has [\\d,]+ characters of text, more than the 4,000 Discord shows in one message`,
 			),
 		);
 	}

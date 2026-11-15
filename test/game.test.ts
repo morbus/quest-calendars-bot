@@ -5,7 +5,7 @@ import { basename, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Button, Component } from '../src/components.ts';
 import { createGame, everyScreen, type Game, type Reply } from '../src/game.ts';
-import { loadQuests, MAX_ID_LENGTH, type Image, type Quest } from '../src/registry.ts';
+import { loadQuests, MAX_ID_LENGTH, type Image, type LoadedQuest } from '../src/registry.ts';
 import { openStorage } from '../src/storage.ts';
 
 /**
@@ -71,7 +71,7 @@ function buttonStates(reply: Reply): { disabled: boolean; label: string }[] {
 /**
  * A Game with in-memory storage and the given Quests.
  */
-function newGame(quests: Quest[] = QUESTS): Game {
+function newGame(quests: LoadedQuest[] = QUESTS): Game {
 	return createGame({ quests, storage: openStorage(':memory:') });
 }
 
@@ -188,7 +188,7 @@ test('Next shows the next Character, with their image, and Previous and Next wra
 
 	assert.deepEqual(second.components[0], {
 		components: [
-			{ items: [{ media: image('clockwork-tower/characters/tinker.PNG') }], type: 'mediaGallery' },
+			{ items: [{ media: image('clockwork-tower/tinker.PNG') }], type: 'mediaGallery' },
 			{ content: '## Tinker\nBuilds what the tower breaks.', type: 'textDisplay' },
 			{ content: '**Stats**\nMax Health 10, Defense +2, Attack +1, Damage d6', type: 'textDisplay' },
 			{
@@ -244,7 +244,7 @@ test('choosing a Character says starting a Quest is coming soon', () => {
 /**
  * The fixture Quests, with The Clockwork Tower's Characters narrowed to those `keep` accepts.
  */
-function questsWithTowerCharacters(keep: (name: string) => boolean): Quest[] {
+function questsWithTowerCharacters(keep: (name: string) => boolean): LoadedQuest[] {
 	return QUESTS.map((quest) =>
 		quest.id === 'clockwork-tower'
 			? { ...quest, characters: quest.characters.filter((character) => keep(character.name)) }
@@ -308,20 +308,20 @@ test('a button for a Quest that does not exist is an error', () => {
 	);
 });
 
-test('every screen of every Quest and Character is listed with the file that declared it, as Players see it', () => {
+test('every screen of every Quest and Character is listed with where it is declared, as Players see it', () => {
 	const game = newGame();
 	const fixtures = fileURLToPath(new URL('fixtures/quests/', import.meta.url));
 
 	const screens = everyScreen(QUESTS);
 
 	assert.deepEqual(
-		screens.map(({ file }) => relative(fixtures, file)),
+		screens.map(({ source }) => relative(fixtures, source)),
 		[
 			'pilgrimage/quest.ts',
-			'pilgrimage/characters/pilgrim.ts',
+			'pilgrimage/quest.ts: characters[0]',
 			'clockwork-tower/quest.ts',
-			'clockwork-tower/characters/warden.ts',
-			'clockwork-tower/characters/tinker.ts',
+			'clockwork-tower/quest.ts: characters[0]',
+			'clockwork-tower/quest.ts: characters[1]',
 		],
 	);
 	const { reply: amberRoad } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
