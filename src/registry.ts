@@ -24,8 +24,8 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const IMAGE_EXTENSIONS = ['.gif', '.jpeg', '.jpg', '.png', '.webp'];
 
 /**
- * The longest id, which keeps the button ids made from it within Discord's 100 characters,
- * such as one holding both a Quest's id and a Character's.
+ * The longest possible id, which keeps the button ids made from it within range of
+ * Discord's 100 characters, such as one holding both a Quest's id and a Character's.
  */
 export const MAX_ID_LENGTH = 44;
 
@@ -47,6 +47,7 @@ type Claims = {
 	 * The file that declared each id.
 	 */
 	ids: Map<string, string>;
+
 	/**
 	 * The file that declared each name.
 	 */
@@ -61,6 +62,7 @@ export type Image = {
 	 * The image file's bytes.
 	 */
 	data: Buffer;
+
 	/**
 	 * The image file's name, such as "tower.png".
 	 */
@@ -75,6 +77,7 @@ export type Loaded<T extends { image?: string }> = Omit<T, 'image'> & {
 	 * The file that declared it, such as a Quest's `quest.ts`, to name in errors.
 	 */
 	file: string;
+
 	/**
 	 * The image to show with it, if any.
 	 */
@@ -303,11 +306,9 @@ function newClaims(): Claims {
 }
 
 /**
- * `declared`, as declared in `file`, with its image, if any, read from its path relative to `file`,
- * which must stay in `questDir`.
- *
- * @remarks
- * Reading it now means a reply still shows it if the file moves while the bot runs.
+ * `declared`, as declared in `file`, with its image, if any, read from its path relative to
+ * `file`, which must stay in `questDir`. Reading it now means a reply still shows it if the
+ * file moves while the bot runs.
  *
  * @throws When the image isn't an image file, is outside `questDir`, doesn't exist, or is too large for Discord.
  */
