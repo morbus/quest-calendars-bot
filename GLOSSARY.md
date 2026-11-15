@@ -53,8 +53,8 @@ The one kind of money a **Quest** uses, named by that **Quest**
 _Avoid_: Coins, money.
 
 **Reputation**:
-How a **Quest**'s world sees the **Player**'s **Character**, from 0 to 20, named by that **Quest**
-(Notoriety, Virtue). It changes with decisions on **Pages**, and every **Quest** has one.
+How a **Quest**'s world sees the **Player**'s **Character**, named by that **Quest**
+(Notoriety, Virtue). It increases or decreases based on decisions made on **Pages**.
 _Avoid_: Meter.
 
 **Action**:
