@@ -16,14 +16,26 @@ import { fileURLToPath } from 'node:url';
 const DB_FILE = fileURLToPath(new URL('../quest-calendars-bot.sqlite', import.meta.url));
 
 /**
+ * How long a failed startup waits for its last log lines to be written before it forces Node to exit.
+ */
+const EXIT_GRACE_MS = 1000;
+
+/**
  * The project folder, which relative QUESTS_DIR entries resolve against, wherever the bot is started from.
  */
 const PROJECT_DIR = fileURLToPath(new URL('..', import.meta.url));
 
 /**
- * How long a failed startup waits for its last log lines to be written before it forces Node to exit.
+ * Whether `timezone` is one `Intl` accepts, such as "America/New_York" or "+05:00".
  */
-const EXIT_GRACE_MS = 1000;
+function isTimezone(timezone: string): boolean {
+	try {
+		new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 /**
  * Starts the bot.
@@ -62,7 +74,7 @@ async function main(): Promise<void> {
 	}
 	logger.info('Opened game state', { from: DB_FILE });
 
-	// Like PATH, QUESTS_DIR lists directories separated by colons.
+	// QUESTS_DIR lists directories separated by colons.
 	const questDirs = questsPath.split(':').map((dir) => resolve(PROJECT_DIR, dir));
 	let quests;
 	try {
@@ -94,15 +106,3 @@ main().catch((error) => {
 	// Exit once the log has had time to be written. The timer doesn't keep Node alive by itself.
 	setTimeout(() => process.exit(), EXIT_GRACE_MS).unref();
 });
-
-/**
- * Whether `timezone` is one `Intl` accepts, such as "America/New_York" or "+05:00".
- */
-function isTimezone(timezone: string): boolean {
-	try {
-		new Intl.DateTimeFormat('en-US', { timeZone: timezone });
-		return true;
-	} catch {
-		return false;
-	}
-}
