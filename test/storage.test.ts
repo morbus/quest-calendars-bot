@@ -66,11 +66,11 @@ test('a migration that fails partway leaves the database as it was, so it can be
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
 	const old = new DatabaseSync(path);
-	old.exec('CREATE TABLE sheets (note TEXT)');
+	old.exec('CREATE TABLE player_sheets (note TEXT)');
 
-	assert.throws(() => openStorage(path), /table sheets already exists/);
+	assert.throws(() => openStorage(path), /table player_sheets already exists/);
 
-	old.exec('DROP TABLE sheets');
+	old.exec('DROP TABLE player_sheets');
 	old.close();
 	assert.doesNotThrow(() => openStorage(path));
 });
@@ -79,7 +79,7 @@ test('a migration that fails partway leaves the database as it was, so it can be
  * The Amber Road, started as the Pilgrim.
  */
 const AMBER_ROAD: PlayerQuest = {
-	backlog: 1,
+	backlogCount: 1,
 	backlogUpdated: '2026-11-13',
 	characterId: 'pilgrim',
 	lastPlayed: null,
@@ -109,7 +109,7 @@ test("a Player's Quest without its Sheet is an error, not a Quest they aren't pl
 	const storage = openStorage(path);
 	storage.transaction(() => storage.startQuest('player-1', AMBER_ROAD));
 	const db = new DatabaseSync(path);
-	db.exec("DELETE FROM sheets WHERE player_id = 'player-1'");
+	db.exec("DELETE FROM player_sheets WHERE player_id = 'player-1'");
 	db.close();
 
 	assert.throws(() => storage.playerQuest('player-1', 'amber-road'), /player-1's amber-road Quest has no Sheet/);

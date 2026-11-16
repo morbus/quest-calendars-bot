@@ -24,14 +24,14 @@ const MIGRATIONS = [
 		player_id TEXT NOT NULL,
 		quest_id TEXT NOT NULL,
 		character_id TEXT NOT NULL,
-		pages_played INTEGER NOT NULL,
-		backlog INTEGER NOT NULL,
-		backlog_updated TEXT NOT NULL,
 		started TEXT NOT NULL,
 		last_played TEXT,
+		pages_played INTEGER NOT NULL,
+		backlog_count INTEGER NOT NULL,
+		backlog_updated TEXT NOT NULL,
 		PRIMARY KEY (player_id, quest_id)
 	) STRICT;
-	CREATE TABLE sheets (
+	CREATE TABLE player_sheets (
 		player_id TEXT NOT NULL,
 		quest_id TEXT NOT NULL,
 		stats TEXT NOT NULL,
@@ -49,7 +49,7 @@ export type PlayerQuest = {
 	/**
 	 * How many Pages the Player can play now, at most 14.
 	 */
-	backlog: number;
+	backlogCount: number;
 
 	/**
 	 * The Game Day the Backlog was last brought up to date, such as "2026-11-13".
@@ -101,7 +101,7 @@ type PlayerQuestRow = {
 	/**
 	 * How many Pages the Player can play now.
 	 */
-	backlog: number;
+	backlog_count: number;
 
 	/**
 	 * The Game Day the Backlog was last brought up to date.
@@ -225,8 +225,8 @@ export function openStorage(path: string): Storage {
 		playerQuest(playerId, questId) {
 			const row = db
 				.prepare(
-					`SELECT character_id, pages_played, backlog, backlog_updated, started, last_played, stats, traits, abilities
-					FROM player_quests LEFT JOIN sheets USING (player_id, quest_id)
+					`SELECT character_id, started, last_played, pages_played, backlog_count, backlog_updated, stats, traits, abilities
+					FROM player_quests LEFT JOIN player_sheets USING (player_id, quest_id)
 					WHERE player_id = ? AND quest_id = ?`,
 				)
 				.get(playerId, questId) as PlayerQuestRow | undefined;
@@ -234,7 +234,7 @@ export function openStorage(path: string): Storage {
 			// without its Quest, means the game state was damaged.
 			if (row === undefined) {
 				const leftoverSheet = db
-					.prepare('SELECT 1 FROM sheets WHERE player_id = ? AND quest_id = ?')
+					.prepare('SELECT 1 FROM player_sheets WHERE player_id = ? AND quest_id = ?')
 					.get(playerId, questId);
 				if (leftoverSheet !== undefined) throw damaged(playerId, questId, 'Sheet has no Quest');
 				return undefined;
@@ -243,7 +243,7 @@ export function openStorage(path: string): Storage {
 				throw damaged(playerId, questId, 'Quest has no Sheet');
 			}
 			return {
-				backlog: row.backlog,
+				backlogCount: row.backlog_count,
 				backlogUpdated: row.backlog_updated,
 				characterId: row.character_id,
 				lastPlayed: row.last_played,
@@ -257,13 +257,18 @@ export function openStorage(path: string): Storage {
 				started: row.started,
 			};
 		},
-		startQuest(playerId, { backlog, backlogUpdated, characterId, lastPlayed, pagesPlayed, questId, sheet, started }) {
+		startQuest(
+			playerId,
+			{ backlogCount, backlogUpdated, characterId, lastPlayed, pagesPlayed, questId, sheet, started },
+		) {
 			db.prepare(
 				`INSERT INTO player_quests
-				(player_id, quest_id, character_id, pages_played, backlog, backlog_updated, started, last_played)
+				(player_id, quest_id, character_id, started, last_played, pages_played, backlog_count, backlog_updated)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			).run(playerId, questId, characterId, pagesPlayed, backlog, backlogUpdated, started, lastPlayed);
-			db.prepare('INSERT INTO sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?)').run(
+			).run(playerId, questId, characterId, started, lastPlayed, pagesPlayed, backlogCount, backlogUpdated);
+			db.prepare(
+				'INSERT INTO player_sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?)',
+			).run(
 				playerId,
 				questId,
 				JSON.stringify(sheet.stats),

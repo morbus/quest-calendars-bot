@@ -330,7 +330,7 @@ function signed(modifier: number): string {
 function startedQuest(quest: LoadedQuest, character: Loaded<Character>, startGameDay: string, now: Date): PlayerQuest {
 	const { abilities, stats, traits } = character;
 	return {
-		backlog: 1,
+		backlogCount: 1,
 		backlogUpdated: startGameDay,
 		characterId: character.id,
 		lastPlayed: null,
