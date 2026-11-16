@@ -5,16 +5,6 @@
 import { DatabaseSync } from 'node:sqlite';
 
 /**
- * Reads and writes the game state in SQLite; open it with {@link openStorage}.
- */
-export type Storage = {
-	/**
-	 * Runs `work` in one transaction, rolling it back if `work` throws.
-	 */
-	transaction<T>(work: () => T): T;
-};
-
-/**
  * How long to wait for another writer on the same file before failing.
  *
  * @remarks
@@ -23,6 +13,16 @@ export type Storage = {
  * A second command queued behind the same lock can still miss it.
  */
 const BUSY_TIMEOUT_MS = 2000;
+
+/**
+ * Reads and writes the game state in SQLite; open it with {@link openStorage}.
+ */
+export type Storage = {
+	/**
+	 * Runs `work` in one transaction, rolling it back if `work` throws.
+	 */
+	transaction<T>(work: () => T): T;
+};
 
 /**
  * Opens the SQLite file at `path`, creating it if needed.

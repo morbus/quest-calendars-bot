@@ -6,9 +6,12 @@ import { fileURLToPath } from 'node:url';
 import winston from 'winston';
 
 /**
- * The log file path.
+ * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
  */
-const LOG_FILE = fileURLToPath(new URL('../logs/quest-calendars-bot.log', import.meta.url));
+const consoleLine = winston.format.printf(({ timestamp, level, message, stack, ...fields }) => {
+	const extra = Object.keys(fields).length > 0 ? ` ${JSON.stringify(fields)}` : '';
+	return `${timestamp} ${level} ${message}${extra}${stack ? `\n${stack}` : ''}`;
+});
 
 /**
  * The interaction token in a Discord webhook or interaction URL.
@@ -16,12 +19,9 @@ const LOG_FILE = fileURLToPath(new URL('../logs/quest-calendars-bot.log', import
 const DISCORD_TOKEN_IN_URL = /(\/(?:webhooks|interactions)\/\d+\/)[^/?]+/g;
 
 /**
- * Masks the token in a `url` field and drops a `requestBody` field.
+ * The log file path.
  */
-function scrubDiscordRequest(fields: Record<string, unknown>): void {
-	delete fields.requestBody;
-	if (typeof fields.url === 'string') fields.url = fields.url.replace(DISCORD_TOKEN_IN_URL, '$1:token');
-}
+const LOG_FILE = fileURLToPath(new URL('../logs/quest-calendars-bot.log', import.meta.url));
 
 /**
  * Keeps Discord's interaction tokens and request bodies out of the logs.
@@ -39,14 +39,6 @@ const redactDiscordRequests = winston.format((info) => {
 		info.error = error;
 	}
 	return info;
-});
-
-/**
- * Formats a console line as "message \{fields\}", plus the stack, if any, on the lines below.
- */
-const consoleLine = winston.format.printf(({ timestamp, level, message, stack, ...fields }) => {
-	const extra = Object.keys(fields).length > 0 ? ` ${JSON.stringify(fields)}` : '';
-	return `${timestamp} ${level} ${message}${extra}${stack ? `\n${stack}` : ''}`;
 });
 
 /**
@@ -76,3 +68,11 @@ export const logger = winston.createLogger({
 		}),
 	],
 });
+
+/**
+ * Masks the token in a `url` field and drops a `requestBody` field.
+ */
+function scrubDiscordRequest(fields: Record<string, unknown>): void {
+	delete fields.requestBody;
+	if (typeof fields.url === 'string') fields.url = fields.url.replace(DISCORD_TOKEN_IN_URL, '$1:token');
+}

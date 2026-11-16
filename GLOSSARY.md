@@ -44,13 +44,18 @@ _Avoid_: Camp, long rest, recovery.
 
 **Sheet**:
 The current state of one **Player**'s **Character** in one **Quest**: **Stats**,
-**Traits**, **Abilities**, **Currency**, equipment, items, and conditions.
+**Traits**, **Abilities**, **Currency**, **Reputation**, equipment, items, and conditions.
 _Avoid_: Character sheet, profile.
 
 **Currency**:
 The one kind of money a **Quest** uses, named by that **Quest**
 (gold, scrap), and can go negative only as debt from a required payment.
 _Avoid_: Coins, money.
+
+**Reputation**:
+How a **Quest**'s world sees the **Player**'s **Character**, named by that **Quest**
+(Notoriety, Virtue). It increases or decreases based on decisions made on **Pages**.
+_Avoid_: Meter.
 
 **Action**:
 One thing the **Player** does on a **Page**, usually a die roll plus
@@ -99,8 +104,7 @@ by that server's admins. A server with none chosen receives no **Announcements**
 A one-line, spoiler-free summary of a **Page**, written by its author for **Announcements**.
 
 **Rule Module**:
-An optional set of game mechanics, such as the Sunday Lottery, Minions, or Crafting, that
-a **Quest** turns on; the core rules, including **Currency**, apply to every **Quest**.
+An optional set of game mechanics, such as the Crafting or Minions,, that a **Quest** turns on.
 
 ## Relationships
 
