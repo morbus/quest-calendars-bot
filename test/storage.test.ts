@@ -79,14 +79,18 @@ test('a migration that fails partway leaves the database as it was, so it can be
  * The Amber Road, started as the Pilgrim.
  */
 const AMBER_ROAD: PlayerQuest = {
+	backlog: 1,
+	backlogUpdated: '2026-11-13',
 	characterId: 'pilgrim',
+	lastPlayed: null,
+	pagesPlayed: 0,
 	questId: 'amber-road',
 	sheet: {
 		abilities: [],
 		stats: { attack: 0, damage: 'd4', defense: 1, maxHealth: 8 },
 		traits: { strength: 0, dexterity: 0, constitution: 1, intellect: 0, wisdom: 2, charisma: 1 },
 	},
-	startGameDay: '2026-11-13',
+	started: '2026-11-13T09:00:00.000Z',
 };
 
 test('a Player cannot start a Quest they are already playing', () => {

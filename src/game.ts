@@ -3,15 +3,15 @@
  */
 
 import { TRAITS, type Character } from './builder.ts';
-import { gameDay, gameDayName } from './calendar.ts';
+import { gameDay } from './calendar.ts';
 import type { ActionRow, Button, Component, TextDisplay } from './components.ts';
 import type { Image, Loaded, LoadedQuest } from './registry.ts';
 import type { PlayerQuest, Sheet, Storage } from './storage.ts';
 
 /**
- * The Game Day whose name, "September 30, 2026", is as long as any Game Day's name can be.
+ * A start whose Discord timestamp, ten digits of seconds, is as long as any until the year 2286.
  */
-const LONGEST_GAME_DAY = '2026-09-30';
+const LONGEST_START = new Date(9_999_999_999_000);
 
 /**
  * The game rules, with no knowledge of Discord.
@@ -41,6 +41,11 @@ type InputContext = {
 	 * The Game Day the Input arrived on.
 	 */
 	gameDay: string;
+
+	/**
+	 * When the Input arrived.
+	 */
+	now: Date;
 
 	/**
 	 * The Discord user ID of the Player who sent it.
@@ -172,7 +177,9 @@ export function createGame({
 		handle(playerId, _serverId, input, now) {
 			return storage.transaction(() => {
 				if ('command' in input) return { reply: showQuest(quests, 0) };
-				return { reply: pressButton({ gameDay: gameDay(now, timezone), playerId, quests, storage }, input.button) };
+				return {
+					reply: pressButton({ gameDay: gameDay(now, timezone), now, playerId, quests, storage }, input.button),
+				};
 			});
 		},
 	};
@@ -181,14 +188,14 @@ export function createGame({
 /**
  * Every screen of every Quest and Character, as Players see it, with where it is declared:
  * the Quest's file, and a Character's place and id in `characters`, so startup can check each fits in Discord.
- * A Character's screen once started shows the Game Day with the longest name, so it fits on any day.
+ * A Character's screen once started shows the longest start time, so it fits whenever they start.
  */
 export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: string }[] {
 	return quests.flatMap((quest, index) => [
 		{ reply: showQuest(quests, index), source: quest.file },
 		...quest.characters.flatMap((character, i) => {
 			const source = `${quest.file}: characters[${i}] (${character.id})`;
-			const started = startedQuest(quest, character, LONGEST_GAME_DAY);
+			const started = startedQuest(quest, character, gameDay(LONGEST_START, 'UTC'), LONGEST_START);
 			return [
 				{ reply: showCharacter(quest, i), source },
 				{ reply: showStarted(quest, character, started), source: `${source}, once started` },
@@ -281,16 +288,25 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 }
 
 /**
- * Shows the Quest the Player just started: the Character they picked, the Game Day they started on, and their Sheet.
+ * Shows the Quest the Player just started: the Character they picked, their Sheet, and their progress,
+ * with when they started in Discord's timestamp, which each Player sees in their own timezone.
  */
-function showStarted(quest: LoadedQuest, character: Loaded<Character>, { sheet, startGameDay }: PlayerQuest): Reply {
+function showStarted(
+	quest: LoadedQuest,
+	character: Loaded<Character>,
+	{ backlog, pagesPlayed, sheet, started }: PlayerQuest,
+): Reply {
+	const startedAt = `<t:${Math.floor(Date.parse(started) / 1000)}:f>`;
 	return {
 		components: [
 			card(
 				{ name: quest.name },
-				`You start as ${character.name} on Game Day ${gameDayName(startGameDay)}.`,
-				characterDetails(sheet),
-				'Use `/quest play` to play your first Page.',
+				`You start as ${character.name}. Your first Page is ready.`,
+				[
+					...characterDetails(sheet),
+					text(`**Progress**\nBacklog ${backlog}, Pages played ${pagesPlayed}, Started ${startedAt}`),
+				],
+				'Use `/quest play` to play it.',
 			),
 		],
 	};
@@ -304,24 +320,33 @@ function signed(modifier: number): string {
 }
 
 /**
- * `quest` as started by a Player as `character` on the Game Day `startGameDay`,
- * with a Sheet of the Character's starting Stats, Traits, and Abilities.
+ * `quest` as started by a Player as `character` at `now`, on the Game Day `startGameDay`: its first Page
+ * in their Backlog, none played yet, and a Sheet of the Character's starting Stats, Traits, and Abilities.
  */
-function startedQuest(quest: LoadedQuest, character: Loaded<Character>, startGameDay: string): PlayerQuest {
+function startedQuest(quest: LoadedQuest, character: Loaded<Character>, startGameDay: string, now: Date): PlayerQuest {
 	const { abilities, stats, traits } = character;
-	return { characterId: character.id, questId: quest.id, sheet: { abilities, stats, traits }, startGameDay };
+	return {
+		backlog: 1,
+		backlogUpdated: startGameDay,
+		characterId: character.id,
+		lastPlayed: null,
+		pagesPlayed: 0,
+		questId: quest.id,
+		sheet: { abilities, stats, traits },
+		started: now.toISOString(),
+	};
 }
 
 /**
- * Starts `quest` for the Player as `character`, on today's Game Day, with a Sheet of the Character's
- * starting Stats, Traits, and Abilities, and shows it.
+ * Starts `quest` for the Player as `character`, now, with its first Page in their Backlog
+ * and a Sheet of the Character's starting Stats, Traits, and Abilities, and shows it.
  */
 function startQuest(
-	{ gameDay, playerId, storage }: InputContext,
+	{ gameDay, now, playerId, storage }: InputContext,
 	quest: LoadedQuest,
 	character: Loaded<Character>,
 ): Reply {
-	storage.startQuest(playerId, startedQuest(quest, character, gameDay));
+	storage.startQuest(playerId, startedQuest(quest, character, gameDay, now));
 	return showStarted(quest, character, storage.playerQuest(playerId, quest.id)!);
 }
 

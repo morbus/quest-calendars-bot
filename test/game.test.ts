@@ -236,7 +236,7 @@ test('a Character with no Abilities says so', () => {
 	assert.ok(textsIn(reply).includes('**Abilities**\nnone'));
 });
 
-test("choosing a Character starts the Quest on today's Game Day, with a Sheet of their starting Stats, Traits, and Abilities", () => {
+test('choosing a Character starts the Quest with one Page in the Backlog, and a Sheet of their starting Stats, Traits, and Abilities', () => {
 	const game = newGame();
 
 	const tinker = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next');
@@ -248,7 +248,7 @@ test("choosing a Character starts the Quest on today's Game Day, with a Sheet of
 			{
 				components: [
 					{
-						content: '## The Clockwork Tower\nYou start as Tinker on Game Day November 13, 2026.',
+						content: '## The Clockwork Tower\nYou start as Tinker. Your first Page is ready.',
 						type: 'textDisplay',
 					},
 					{ content: '**Stats**\nMax Health 10, Defense +2, Attack +1, Damage d6', type: 'textDisplay' },
@@ -261,8 +261,9 @@ test("choosing a Character starts the Quest on today's Game Day, with a Sheet of
 							'**Abilities**\n- Gadgeteer: Once per Rest: add d4 to an Intellect roll.\n- Spare Parts: Add +1 to rolls to repair.',
 						type: 'textDisplay',
 					},
+					{ content: '**Progress**\nBacklog 1, Pages played 0, Started <t:1794560400:f>', type: 'textDisplay' },
 					{ type: 'separator' },
-					{ content: '-# Use `/quest play` to play your first Page.', type: 'textDisplay' },
+					{ content: '-# Use `/quest play` to play it.', type: 'textDisplay' },
 				],
 				type: 'container',
 			},
@@ -270,16 +271,15 @@ test("choosing a Character starts the Quest on today's Game Day, with a Sheet of
 	});
 });
 
-test("a Quest started before midnight in the game's timezone starts on that Game Day, even after midnight UTC", () => {
+test('a Quest started partway through a second shows its start time in whole seconds', () => {
 	const game = newGame();
-	// 10:30 PM on November 20 in New York.
-	const lateEvening = new Date('2026-11-21T03:30:00Z');
-	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, lateEvening);
-	const characters = game.handle('player-1', 'server-1', { button: buttonsIn(quests)[1]!.id }, lateEvening).reply;
+	const partway = new Date('2026-11-13T09:00:00.999Z');
+	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, partway);
+	const characters = game.handle('player-1', 'server-1', { button: buttonsIn(quests)[1]!.id }, partway).reply;
 
-	const { reply } = game.handle('player-1', 'server-1', { button: buttonsIn(characters)[0]!.id }, lateEvening);
+	const { reply } = game.handle('player-1', 'server-1', { button: buttonsIn(characters)[0]!.id }, partway);
 
-	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 20, 2026.');
+	assert.ok(textsIn(reply).includes('**Progress**\nBacklog 1, Pages played 0, Started <t:1794560400:f>'));
 });
 
 /**
@@ -322,7 +322,7 @@ test('another Player can start a Quest someone else is already playing', () => {
 
 	const { reply } = game.handle('player-2', 'server-1', { button: buttonsIn(characters)[0]!.id }, NOW);
 
-	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 13, 2026.');
+	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim. Your first Page is ready.');
 });
 
 test('moving through the Characters of a Quest the Player is already playing is refused', () => {
@@ -351,7 +351,7 @@ test('a Player playing one Quest can start another', () => {
 
 	const reply = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Choose this Character');
 
-	assert.equal(textsIn(reply)[0], '## The Clockwork Tower\nYou start as Iron Warden on Game Day November 13, 2026.');
+	assert.equal(textsIn(reply)[0], '## The Clockwork Tower\nYou start as Iron Warden. Your first Page is ready.');
 });
 
 test('a Quest started before the bot restarts is still being played after it', async () => {
@@ -386,7 +386,7 @@ test('an old Choose this Character button still chooses the same Character after
 
 	assert.equal(
 		textsIn(after.handle('player-1', 'server-1', { button: choose }, NOW).reply)[0],
-		'## The Clockwork Tower\nYou start as Tinker on Game Day November 13, 2026.',
+		'## The Clockwork Tower\nYou start as Tinker. Your first Page is ready.',
 	);
 	assert.throws(() => gone.handle('player-1', 'server-1', { button: choose }, NOW), /Unknown button/);
 });
@@ -458,20 +458,20 @@ test('every screen of every Quest and Character is listed with where it is decla
 	assert.deepEqual(screens[6]?.reply, press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next'));
 });
 
-test("a Character's screen once started is listed as it shows on the Game Day with the longest name", () => {
+test("a Character's screen once started is listed as it shows at the latest start with a ten-digit Discord timestamp", () => {
 	const game = newGame();
-	// Noon on September 30 in New York.
-	const septemberThirtieth = new Date('2026-09-30T16:00:00Z');
-	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, septemberThirtieth);
+	// The last second, in the year 2286, whose Discord timestamp has ten digits.
+	const latest = new Date(9_999_999_999_000);
+	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, latest);
 	const towerQuest = game.handle(
 		'player-1',
 		'server-1',
 		{ button: buttonsIn(press(game, quests, 'Next'))[1]!.id },
-		septemberThirtieth,
+		latest,
 	).reply;
 	const tinker = press(game, towerQuest, 'Next');
 
-	const started = game.handle('player-1', 'server-1', { button: buttonsIn(tinker)[1]!.id }, septemberThirtieth).reply;
+	const started = game.handle('player-1', 'server-1', { button: buttonsIn(tinker)[1]!.id }, latest).reply;
 
 	assert.deepEqual(everyScreen(QUESTS)[7]?.reply, started);
 });

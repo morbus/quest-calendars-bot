@@ -24,7 +24,11 @@ const MIGRATIONS = [
 		player_id TEXT NOT NULL,
 		quest_id TEXT NOT NULL,
 		character_id TEXT NOT NULL,
-		start_game_day TEXT NOT NULL,
+		pages_played INTEGER NOT NULL,
+		backlog INTEGER NOT NULL,
+		backlog_updated TEXT NOT NULL,
+		started TEXT NOT NULL,
+		last_played TEXT,
 		PRIMARY KEY (player_id, quest_id)
 	) STRICT;
 	CREATE TABLE sheets (
@@ -43,9 +47,30 @@ const MIGRATIONS = [
  */
 export type PlayerQuest = {
 	/**
+	 * How many Pages the Player can play now, at most 14.
+	 */
+	backlog: number;
+
+	/**
+	 * The Game Day the Backlog was last brought up to date, such as "2026-11-13".
+	 */
+	backlogUpdated: string;
+
+	/**
 	 * The id of the Character the Player picked.
 	 */
 	characterId: string;
+
+	/**
+	 * When the Player last played a Page, as a UTC timestamp such as
+	 * "2026-11-13T09:00:00.000Z", or `null` before they play their first.
+	 */
+	lastPlayed: string | null;
+
+	/**
+	 * How many Pages the Player has played.
+	 */
+	pagesPlayed: number;
 
 	/**
 	 * The Quest's id.
@@ -58,9 +83,9 @@ export type PlayerQuest = {
 	sheet: Sheet;
 
 	/**
-	 * The Game Day the Player started the Quest, such as "2026-11-13".
+	 * When the Player started the Quest, as a UTC timestamp such as "2026-11-13T09:00:00.000Z".
 	 */
-	startGameDay: string;
+	started: string;
 };
 
 /**
@@ -74,14 +99,34 @@ type PlayerQuestRow = {
 	abilities: string | null;
 
 	/**
+	 * How many Pages the Player can play now.
+	 */
+	backlog: number;
+
+	/**
+	 * The Game Day the Backlog was last brought up to date.
+	 */
+	backlog_updated: string;
+
+	/**
 	 * The id of the Character the Player picked.
 	 */
 	character_id: string;
 
 	/**
-	 * The Game Day the Player started the Quest, such as "2026-11-13".
+	 * When the Player last played a Page, or `null` before their first.
 	 */
-	start_game_day: string;
+	last_played: string | null;
+
+	/**
+	 * How many Pages the Player has played.
+	 */
+	pages_played: number;
+
+	/**
+	 * When the Player started the Quest.
+	 */
+	started: string;
 
 	/**
 	 * The Sheet's Stats, as JSON.
@@ -180,7 +225,7 @@ export function openStorage(path: string): Storage {
 		playerQuest(playerId, questId) {
 			const row = db
 				.prepare(
-					`SELECT character_id, start_game_day, stats, traits, abilities
+					`SELECT character_id, pages_played, backlog, backlog_updated, started, last_played, stats, traits, abilities
 					FROM player_quests LEFT JOIN sheets USING (player_id, quest_id)
 					WHERE player_id = ? AND quest_id = ?`,
 				)
@@ -198,20 +243,26 @@ export function openStorage(path: string): Storage {
 				throw damaged(playerId, questId, 'Quest has no Sheet');
 			}
 			return {
+				backlog: row.backlog,
+				backlogUpdated: row.backlog_updated,
 				characterId: row.character_id,
+				lastPlayed: row.last_played,
+				pagesPlayed: row.pages_played,
 				questId,
 				sheet: {
 					abilities: JSON.parse(row.abilities),
 					stats: JSON.parse(row.stats),
 					traits: JSON.parse(row.traits),
 				},
-				startGameDay: row.start_game_day,
+				started: row.started,
 			};
 		},
-		startQuest(playerId, { characterId, questId, sheet, startGameDay }) {
+		startQuest(playerId, { backlog, backlogUpdated, characterId, lastPlayed, pagesPlayed, questId, sheet, started }) {
 			db.prepare(
-				'INSERT INTO player_quests (player_id, quest_id, character_id, start_game_day) VALUES (?, ?, ?, ?)',
-			).run(playerId, questId, characterId, startGameDay);
+				`INSERT INTO player_quests
+				(player_id, quest_id, character_id, pages_played, backlog, backlog_updated, started, last_played)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			).run(playerId, questId, characterId, pagesPlayed, backlog, backlogUpdated, started, lastPlayed);
 			db.prepare('INSERT INTO sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?)').run(
 				playerId,
 				questId,
