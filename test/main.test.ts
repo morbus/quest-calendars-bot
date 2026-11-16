@@ -105,7 +105,11 @@ test("startup fails, naming where each is declared, when a Quest's or Character'
 	});
 
 	assert.equal(code, 1);
-	for (const source of ['quest\\.ts', 'quest\\.ts: characters\\[0\\]', 'quest\\.ts: characters\\[1\\]']) {
+	for (const source of [
+		'quest\\.ts',
+		'quest\\.ts: characters\\[0\\] \\(archivist\\)',
+		'quest\\.ts: characters\\[1\\] \\(reader\\)',
+	]) {
 		assert.match(
 			output,
 			new RegExp(

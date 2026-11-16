@@ -318,10 +318,10 @@ test('every screen of every Quest and Character is listed with where it is decla
 		screens.map(({ source }) => relative(fixtures, source)),
 		[
 			'pilgrimage/quest.ts',
-			'pilgrimage/quest.ts: characters[0]',
+			'pilgrimage/quest.ts: characters[0] (pilgrim)',
 			'clockwork-tower/quest.ts',
-			'clockwork-tower/quest.ts: characters[0]',
-			'clockwork-tower/quest.ts: characters[1]',
+			'clockwork-tower/quest.ts: characters[0] (warden)',
+			'clockwork-tower/quest.ts: characters[1] (tinker)',
 		],
 	);
 	const { reply: amberRoad } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);

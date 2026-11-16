@@ -165,14 +165,16 @@ function checkQuest(value: unknown, questDir: string): Omit<LoadedQuest, 'file'>
 	}
 	const claims = newClaims();
 	const characters = quest.characters.map((character, i) => {
-		const place = `characters[${i}]`;
-		checkObject(place, character);
+		checkObject(`characters[${i}]`, character);
+		// The id names the Character too, unless the id is what's wrong.
+		const usable = typeof character.id === 'string' && ID.test(character.id) && character.id.length <= MAX_ID_LENGTH;
+		const place = usable ? `characters[${i}] (${character.id})` : `characters[${i}]`;
 		try {
 			const loaded = checkCharacter(character, questDir);
 			claim(claims, loaded, place);
 			return loaded;
 		} catch (error) {
-			throw new Error(`${place}.${error instanceof Error ? error.message : error}`, { cause: error });
+			throw new Error(`${place}: ${error instanceof Error ? error.message : error}`, { cause: error });
 		}
 	});
 	return { ...withImage(quest, questDir), characters };

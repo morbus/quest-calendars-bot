@@ -94,7 +94,7 @@ test('two Quests with the same id fail to load', async () => {
 test('two Characters in one Quest with the same id fail to load', async () => {
 	await assert.rejects(
 		load([{ ...QUEST, characters: [CHARACTER, { ...CHARACTER, name: 'Pilgrim Again' }] }]),
-		/quest\.ts: characters\[1\]\.id pilgrim is already used by characters\[0\]/,
+		/quest\.ts: characters\[1\] \(pilgrim\): id pilgrim is already used by characters\[0\] \(pilgrim\)/,
 	);
 });
 
@@ -105,11 +105,11 @@ test('Characters in different Quests can share an id', async () => {
 test('a Character whose Damage is not a die fails to load', async () => {
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, damage: 'lots' } }] }]),
-		/quest\.ts: characters\[0\]\.stats\.damage must be dice, such as d6 or 2d4, not "lots"/,
+		/quest\.ts: characters\[0\] \(pilgrim\): stats\.damage must be dice, such as d6 or 2d4, not "lots"/,
 	);
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, damage: 'a d6 and a d4' } }] }]),
-		/quest\.ts: characters\[0\]\.stats\.damage must be dice, such as d6 or 2d4, not "a d6 and a d4"/,
+		/quest\.ts: characters\[0\] \(pilgrim\): stats\.damage must be dice, such as d6 or 2d4, not "a d6 and a d4"/,
 	);
 });
 
@@ -162,29 +162,29 @@ test('a Quest whose id has a letter outside a–z fails to load', async () => {
 test('a Character whose Trait is not a whole number fails to load', async () => {
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, traits: { ...CHARACTER.traits, wisdom: 1.5 } }] }]),
-		/quest\.ts: characters\[0\]\.traits\.wisdom must be a whole number, not 1\.5/,
+		/quest\.ts: characters\[0\] \(pilgrim\): traits\.wisdom must be a whole number, not 1\.5/,
 	);
 });
 
 test('a Character whose Attack or Defense is not a whole number fails to load', async () => {
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, attack: 0.5 } }] }]),
-		/quest\.ts: characters\[0\]\.stats\.attack must be a whole number, not 0\.5/,
+		/quest\.ts: characters\[0\] \(pilgrim\): stats\.attack must be a whole number, not 0\.5/,
 	);
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, defense: 0.5 } }] }]),
-		/quest\.ts: characters\[0\]\.stats\.defense must be a whole number, not 0\.5/,
+		/quest\.ts: characters\[0\] \(pilgrim\): stats\.defense must be a whole number, not 0\.5/,
 	);
 });
 
 test('a Character whose Max Health is not a whole number of at least 1 fails to load', async () => {
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, maxHealth: 0 } }] }]),
-		/quest\.ts: characters\[0\]\.stats\.maxHealth must be a whole number of at least 1, not 0/,
+		/quest\.ts: characters\[0\] \(pilgrim\): stats\.maxHealth must be a whole number of at least 1, not 0/,
 	);
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, maxHealth: 7.5 } }] }]),
-		/quest\.ts: characters\[0\]\.stats\.maxHealth must be a whole number of at least 1, not 7\.5/,
+		/quest\.ts: characters\[0\] \(pilgrim\): stats\.maxHealth must be a whole number of at least 1, not 7\.5/,
 	);
 });
 
@@ -204,7 +204,7 @@ test('a Quest directory without a quest.ts fails to load, naming the file', asyn
 test('a Character whose id is not letters a–z and digits 0–9 with single hyphens fails to load', async () => {
 	await assert.rejects(
 		load([{ ...QUEST, characters: [{ ...CHARACTER, id: 'pilgrim one' }] }]),
-		/quest\.ts: characters\[0\]\.id must be letters a–z and digits 0–9, with single hyphens between them, not "pilgrim one"/,
+		/quest\.ts: characters\[0\]: id must be letters a–z and digits 0–9, with single hyphens between them, not "pilgrim one"/,
 	);
 });
 
@@ -275,47 +275,53 @@ const MALFORMED: { error: RegExp; name: string; quest: unknown }[] = [
 	{
 		name: 'a Character id that is not text',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, id: 5 }] },
-		error: /quest\.ts: characters\[0\]\.id must be letters a–z and digits 0–9, with single hyphens between them, not 5/,
+		error: /quest\.ts: characters\[0\]: id must be letters a–z and digits 0–9, with single hyphens between them, not 5/,
+	},
+	{
+		name: 'a Character id over 44 characters, which is not named as the Character',
+		quest: { ...QUEST, characters: [{ ...CHARACTER, id: 'p'.repeat(45) }] },
+		error: /quest\.ts: characters\[0\]: id must be at most 44 characters/,
 	},
 	{
 		name: 'a Character with no name',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, name: undefined }] },
-		error: /quest\.ts: characters\[0\]\.name must be text of 1 to 80 characters that isn't blank, not undefined/,
+		error:
+			/quest\.ts: characters\[0\] \(pilgrim\): name must be text of 1 to 80 characters that isn't blank, not undefined/,
 	},
 	{
 		name: 'a Character with no Stats',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, stats: undefined }] },
-		error: /quest\.ts: characters\[0\]\.stats must be an object, not undefined/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): stats must be an object, not undefined/,
 	},
 	{
 		name: 'a Damage that is not text',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, stats: { ...CHARACTER.stats, damage: ['d6'] } }] },
-		error: /quest\.ts: characters\[0\]\.stats\.damage must be dice, such as d6 or 2d4, not \["d6"\]/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): stats\.damage must be dice, such as d6 or 2d4, not \["d6"\]/,
 	},
 	{
 		name: 'a Character with no Traits',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, traits: undefined }] },
-		error: /quest\.ts: characters\[0\]\.traits must be an object, not undefined/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): traits must be an object, not undefined/,
 	},
 	{
 		name: 'a Character with no Abilities',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, abilities: undefined }] },
-		error: /quest\.ts: characters\[0\]\.abilities must be a list, not undefined/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): abilities must be a list, not undefined/,
 	},
 	{
 		name: 'an Ability that is not an object',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, abilities: ['Devout'] }] },
-		error: /quest\.ts: characters\[0\]\.abilities\[0\] must be an object, not "Devout"/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): abilities\[0\] must be an object, not "Devout"/,
 	},
 	{
 		name: 'an Ability with no name',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, abilities: [{ text: 'Add +1 to Wisdom rolls.' }] }] },
-		error: /quest\.ts: characters\[0\]\.abilities\[0\]\.name must be text that isn't blank, not undefined/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): abilities\[0\]\.name must be text that isn't blank, not undefined/,
 	},
 	{
 		name: 'an Ability with no text',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, abilities: [{ name: 'Devout' }] }] },
-		error: /quest\.ts: characters\[0\]\.abilities\[0\]\.text must be text that isn't blank, not undefined/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): abilities\[0\]\.text must be text that isn't blank, not undefined/,
 	},
 	{
 		name: 'a Quest with no description',
@@ -325,7 +331,7 @@ const MALFORMED: { error: RegExp; name: string; quest: unknown }[] = [
 	{
 		name: 'a Character with no description',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, description: ' ' }] },
-		error: /quest\.ts: characters\[0\]\.description must be text that isn't blank, not " "/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): description must be text that isn't blank, not " "/,
 	},
 	{
 		name: 'a Quest image that is not an image file',
@@ -347,12 +353,13 @@ const MALFORMED: { error: RegExp; name: string; quest: unknown }[] = [
 		name: "a Character image outside its Quest's directory",
 		quest: { ...QUEST, characters: [{ ...CHARACTER, image: '../shared/map.png' }] },
 		error:
-			/quest\.ts: characters\[0\]\.image must be a path relative to this file, inside its Quest's directory, not "\.\.\/shared\/map\.png"/,
+			/quest\.ts: characters\[0\] \(pilgrim\): image must be a path relative to this file, inside its Quest's directory, not "\.\.\/shared\/map\.png"/,
 	},
 	{
 		name: 'a Character image that does not exist',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, image: 'missing.png' }] },
-		error: /quest\.ts: characters\[0\]\.image must be a file at that path, relative to this one, not "missing\.png"/,
+		error:
+			/quest\.ts: characters\[0\] \(pilgrim\): image must be a file at that path, relative to this one, not "missing\.png"/,
 	},
 	{
 		name: 'a Rule Module turned on twice',
@@ -372,12 +379,12 @@ const MALFORMED: { error: RegExp; name: string; quest: unknown }[] = [
 	{
 		name: 'an Ability text of only spaces',
 		quest: { ...QUEST, characters: [{ ...CHARACTER, abilities: [{ name: 'Devout', text: ' ' }] }] },
-		error: /quest\.ts: characters\[0\]\.abilities\[0\]\.text must be text that isn't blank, not " "/,
+		error: /quest\.ts: characters\[0\] \(pilgrim\): abilities\[0\]\.text must be text that isn't blank, not " "/,
 	},
 	{
 		name: 'two Characters in one Quest with the same name',
 		quest: { ...QUEST, characters: [CHARACTER, { ...CHARACTER, id: 'pilgrim-again' }] },
-		error: /quest\.ts: characters\[1\]\.name Pilgrim is already used by characters\[0\]/,
+		error: /quest\.ts: characters\[1\] \(pilgrim-again\): name Pilgrim is already used by characters\[0\] \(pilgrim\)/,
 	},
 ];
 

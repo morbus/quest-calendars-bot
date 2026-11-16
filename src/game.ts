@@ -127,12 +127,15 @@ export function createGame({ quests, storage }: { quests: LoadedQuest[]; storage
 
 /**
  * Every screen of every Quest and Character, as Players see it, with where it is declared:
- * the Quest's file, and a Character's place in `characters`, so startup can check each fits in Discord.
+ * the Quest's file, and a Character's place and id in `characters`, so startup can check each fits in Discord.
  */
 export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: string }[] {
 	return quests.flatMap((quest, index) => [
 		{ reply: showQuest(quests, index), source: quest.file },
-		...quest.characters.map((_, i) => ({ reply: showCharacter(quest, i), source: `${quest.file}: characters[${i}]` })),
+		...quest.characters.map((character, i) => ({
+			reply: showCharacter(quest, i),
+			source: `${quest.file}: characters[${i}] (${character.id})`,
+		})),
 	]);
 }
 

@@ -61,11 +61,11 @@ export default quest({
 Every text, such as a name, a description, the `currency`, or the `reputation`, must hold more than spaces, tabs, or line breaks.
 No two Quests may share an id or a name, even across the directories QUESTS_DIR lists.
 Each Quest's and each Character's screen must fit in one Discord message: at most 4,000 characters of text in all, counting its name, description, and, for a Character, Stats, Traits, and Abilities, as well as its button labels and image descriptions.
-The bot won't start while a screen is too long, and its error names the file, the Character's place in `characters` if it's a Character's screen, and how many characters the screen has.
+The bot won't start while a screen is too long, and its error names the file, the Character's place and id in `characters` if it's a Character's screen, and how many characters the screen has.
 
 ## Characters
 
-Each entry in a Quest's `characters` is one Character. An error about one names its place in the list, such as `characters[1].stats.maxHealth`.
+Each entry in a Quest's `characters` is one Character. An error about one names its place in the list and its id, such as `characters[1] (tinker): stats.maxHealth`, or only its place when the id itself is wrong.
 
 - `description`, `id`, `image`, and `name`: as for the Quest. No two Characters in one Quest may share an id or a name.
 - `stats`: the starting Stats. `maxHealth` is a whole number of at least 1. `attack` and `defense` are whole numbers. `damage` is dice, such as `d6` or `2d4`.
