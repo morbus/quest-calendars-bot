@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Button, Component } from '../src/components.ts';
-import { createGame, everyScreen, type Game, type Reply } from '../src/game.ts';
+import { createGame, everyScreen, gameDay, type Game, type Reply } from '../src/game.ts';
 import { loadQuests, MAX_ID_LENGTH, type Image, type LoadedQuest } from '../src/registry.ts';
 import { openStorage } from '../src/storage.ts';
 
@@ -454,4 +454,12 @@ test("a Character's screen once started is listed as it shows whenever they star
 	const started = press(game, tinker, 'Choose this Character');
 
 	assert.deepEqual(everyScreen(QUESTS)[7]?.reply, started);
+});
+
+test("a Game Day rolls over at midnight in the game's timezone, not at midnight UTC", () => {
+	// 10:30 PM on November 20 in New York.
+	const lateEvening = new Date('2026-11-21T03:30:00Z');
+
+	assert.equal(gameDay(lateEvening, 'America/New_York'), '2026-11-20');
+	assert.equal(gameDay(lateEvening, 'UTC'), '2026-11-21');
 });
