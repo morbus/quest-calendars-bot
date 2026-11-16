@@ -17,7 +17,7 @@ export default quest({
 		{
 			id: 'sd-247',
 			name: 'SD-247',
-			image: 'quest-character-sd-247.png',
+			image: 'characters/sd-247.png',
 			description: prose`
 				I am SD-247, a class II ship drone. The life forms on this ship call me "Es-Dee". They
 				are fond of me, as I am loyal to my duties and serve them well. My responsibilities include
