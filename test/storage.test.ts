@@ -58,3 +58,33 @@ test('a new database can be opened and used', async () => {
 		'done',
 	);
 });
+
+test('a migration that fails partway leaves the database as it was, so it can be tried again', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	const path = join(dir.path, 'game.sqlite');
+	const old = new DatabaseSync(path);
+	old.exec('CREATE TABLE sheets (note TEXT)');
+
+	assert.throws(() => openStorage(path), /table sheets already exists/);
+
+	old.exec('DROP TABLE sheets');
+	old.close();
+	assert.doesNotThrow(() => openStorage(path));
+});
+
+test('a Player cannot start a Quest they are already playing', () => {
+	const storage = openStorage(':memory:');
+	const playerQuest = {
+		characterId: 'pilgrim',
+		questId: 'amber-road',
+		sheet: {
+			abilities: [],
+			stats: { attack: 0, damage: 'd4', defense: 1, maxHealth: 8 },
+			traits: { strength: 0, dexterity: 0, constitution: 1, intellect: 0, wisdom: 2, charisma: 1 },
+		},
+		startGameDay: '2026-11-13',
+	};
+	storage.startQuest('player-1', playerQuest);
+
+	assert.throws(() => storage.startQuest('player-1', playerQuest), /UNIQUE constraint failed/);
+});
