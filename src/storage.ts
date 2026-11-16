@@ -121,12 +121,13 @@ export type Storage = {
 	/**
 	 * The Quest with id `questId` that the Player with Discord user ID `playerId` is playing, if they are.
 	 *
-	 * @throws When they are playing it, but it has no Sheet.
+	 * @throws When they are playing it, but it has no Sheet, or it has a Sheet left without the Quest.
 	 */
 	playerQuest(playerId: string, questId: string): PlayerQuest | undefined;
 
 	/**
 	 * Records that the Player with Discord user ID `playerId` started `playerQuest`.
+	 * Call it inside {@link Storage.transaction}, so the Quest and its Sheet are written together.
 	 *
 	 * @throws When they are already playing it.
 	 */
@@ -175,8 +176,15 @@ export function openStorage(path: string): Storage {
 					WHERE player_id = ? AND quest_id = ?`,
 				)
 				.get(playerId, questId) as PlayerQuestRow | undefined;
-			if (row === undefined) return undefined;
-			// Both are written in one transaction, so a Quest without its Sheet means the game state was damaged.
+			// startQuest writes both in one transaction, so a Quest without its Sheet, or a Sheet
+			// without its Quest, means the game state was damaged.
+			if (row === undefined) {
+				const sheet = db.prepare('SELECT 1 FROM sheets WHERE player_id = ? AND quest_id = ?').get(playerId, questId);
+				if (sheet !== undefined) {
+					throw new Error(`Game state is damaged: ${playerId}'s ${questId} Sheet has no Quest`);
+				}
+				return undefined;
+			}
 			if (row.stats === null || row.traits === null || row.abilities === null) {
 				throw new Error(`Game state is damaged: ${playerId}'s ${questId} Quest has no Sheet`);
 			}

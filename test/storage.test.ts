@@ -107,3 +107,16 @@ test("a Player's Quest without its Sheet is an error, not a Quest they aren't pl
 
 	assert.throws(() => storage.playerQuest('player-1', 'amber-road'), /player-1's amber-road Quest has no Sheet/);
 });
+
+test("a Player's Sheet without its Quest is an error, not a Quest they aren't playing", async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	const path = join(dir.path, 'game.sqlite');
+	const storage = openStorage(path);
+	storage.startQuest('player-1', AMBER_ROAD);
+	// With foreign keys off, as in the sqlite3 shell, deleting the Quest leaves its Sheet behind.
+	const db = new DatabaseSync(path, { enableForeignKeyConstraints: false });
+	db.exec("DELETE FROM player_quests WHERE player_id = 'player-1'");
+	db.close();
+
+	assert.throws(() => storage.playerQuest('player-1', 'amber-road'), /player-1's amber-road Sheet has no Quest/);
+});
