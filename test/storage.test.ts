@@ -4,7 +4,7 @@ import { chmod, mkdtempDisposable, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { openStorage } from '../src/storage.ts';
+import { openStorage, type PlayerQuest } from '../src/storage.ts';
 
 test('a file in a folder that does not exist cannot be opened', async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
@@ -75,19 +75,35 @@ test('a migration that fails partway leaves the database as it was, so it can be
 	assert.doesNotThrow(() => openStorage(path));
 });
 
+/**
+ * The Amber Road, started as the Pilgrim.
+ */
+const AMBER_ROAD: PlayerQuest = {
+	characterId: 'pilgrim',
+	questId: 'amber-road',
+	sheet: {
+		abilities: [],
+		stats: { attack: 0, damage: 'd4', defense: 1, maxHealth: 8 },
+		traits: { strength: 0, dexterity: 0, constitution: 1, intellect: 0, wisdom: 2, charisma: 1 },
+	},
+	startGameDay: '2026-11-13',
+};
+
 test('a Player cannot start a Quest they are already playing', () => {
 	const storage = openStorage(':memory:');
-	const playerQuest = {
-		characterId: 'pilgrim',
-		questId: 'amber-road',
-		sheet: {
-			abilities: [],
-			stats: { attack: 0, damage: 'd4', defense: 1, maxHealth: 8 },
-			traits: { strength: 0, dexterity: 0, constitution: 1, intellect: 0, wisdom: 2, charisma: 1 },
-		},
-		startGameDay: '2026-11-13',
-	};
-	storage.startQuest('player-1', playerQuest);
+	storage.startQuest('player-1', AMBER_ROAD);
 
-	assert.throws(() => storage.startQuest('player-1', playerQuest), /UNIQUE constraint failed/);
+	assert.throws(() => storage.startQuest('player-1', AMBER_ROAD), /UNIQUE constraint failed/);
+});
+
+test("a Player's Quest without its Sheet is an error, not a Quest they aren't playing", async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	const path = join(dir.path, 'game.sqlite');
+	const storage = openStorage(path);
+	storage.startQuest('player-1', AMBER_ROAD);
+	const db = new DatabaseSync(path);
+	db.exec("DELETE FROM sheets WHERE player_id = 'player-1'");
+	db.close();
+
+	assert.throws(() => storage.playerQuest('player-1', 'amber-road'), /player-1's amber-road Quest has no Sheet/);
 });

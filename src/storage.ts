@@ -64,13 +64,14 @@ export type PlayerQuest = {
 };
 
 /**
- * A {@link PlayerQuest} as {@link Storage.playerQuest} reads it, with its Sheet's Stats, Traits, and Abilities as JSON.
+ * A {@link PlayerQuest} as {@link Storage.playerQuest} reads it, with its Sheet's Stats, Traits, and Abilities as JSON,
+ * or `null` when the Quest has no Sheet.
  */
 type PlayerQuestRow = {
 	/**
 	 * The Sheet's Abilities, as JSON.
 	 */
-	abilities: string;
+	abilities: string | null;
 
 	/**
 	 * The id of the Character the Player picked.
@@ -85,12 +86,12 @@ type PlayerQuestRow = {
 	/**
 	 * The Sheet's Stats, as JSON.
 	 */
-	stats: string;
+	stats: string | null;
 
 	/**
 	 * The Sheet's Traits, as JSON.
 	 */
-	traits: string;
+	traits: string | null;
 };
 
 /**
@@ -119,6 +120,8 @@ export type Sheet = {
 export type Storage = {
 	/**
 	 * The Quest with id `questId` that the Player with Discord user ID `playerId` is playing, if they are.
+	 *
+	 * @throws When they are playing it, but it has no Sheet.
 	 */
 	playerQuest(playerId: string, questId: string): PlayerQuest | undefined;
 
@@ -168,11 +171,15 @@ export function openStorage(path: string): Storage {
 			const row = db
 				.prepare(
 					`SELECT character_id, start_game_day, stats, traits, abilities
-					FROM player_quests JOIN sheets USING (player_id, quest_id)
+					FROM player_quests LEFT JOIN sheets USING (player_id, quest_id)
 					WHERE player_id = ? AND quest_id = ?`,
 				)
 				.get(playerId, questId) as PlayerQuestRow | undefined;
 			if (row === undefined) return undefined;
+			// Both are written in one transaction, so a Quest without its Sheet means the game state was damaged.
+			if (row.stats === null || row.traits === null || row.abilities === null) {
+				throw new Error(`Game state is damaged: ${playerId}'s ${questId} Quest has no Sheet`);
+			}
 			return {
 				characterId: row.character_id,
 				questId,
