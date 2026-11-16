@@ -31,6 +31,24 @@ test('a database that cannot be written to cannot be opened', { skip: process.ge
 	assert.throws(() => openStorage(path), /attempt to write a readonly database/);
 });
 
+test('a database this version of the bot made can be opened again', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	const path = join(dir.path, 'game.sqlite');
+	openStorage(path);
+
+	assert.doesNotThrow(() => openStorage(path));
+});
+
+test('a database from a newer version of the bot cannot be opened', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	const path = join(dir.path, 'game.sqlite');
+	const newer = new DatabaseSync(path);
+	newer.exec('PRAGMA user_version = 999');
+	newer.close();
+
+	assert.throws(() => openStorage(path), /newer version of the bot/);
+});
+
 test('a new database can be opened and used', async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const storage = openStorage(join(dir.path, 'game.sqlite'));

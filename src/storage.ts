@@ -30,7 +30,6 @@ const MIGRATIONS = [
 	CREATE TABLE sheets (
 		player_id TEXT NOT NULL,
 		quest_id TEXT NOT NULL,
-		health INTEGER NOT NULL,
 		stats TEXT NOT NULL,
 		traits TEXT NOT NULL,
 		abilities TEXT NOT NULL,
@@ -70,7 +69,6 @@ export type PlayerQuest = {
 type PlayerQuestRow = {
 	abilities: string;
 	character_id: string;
-	health: number;
 	start_game_day: string;
 	stats: string;
 	traits: string;
@@ -84,11 +82,6 @@ export type Sheet = {
 	 * The Abilities, in the order Players see them.
 	 */
 	abilities: Ability[];
-
-	/**
-	 * The current Health, at most the Max Health in `stats`.
-	 */
-	health: number;
 
 	/**
 	 * The Stats.
@@ -138,6 +131,9 @@ export function openStorage(path: string): Storage {
 	db.exec('BEGIN IMMEDIATE');
 	try {
 		const { user_version: version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
+		if (version > MIGRATIONS.length) {
+			throw new Error(`Game state has schema version ${version}, from a newer version of the bot`);
+		}
 		for (const migration of MIGRATIONS.slice(version)) db.exec(migration);
 		db.exec(`PRAGMA user_version = ${MIGRATIONS.length}`);
 		db.exec('COMMIT');
@@ -150,7 +146,7 @@ export function openStorage(path: string): Storage {
 		playerQuest(playerId, questId) {
 			const row = db
 				.prepare(
-					`SELECT character_id, start_game_day, health, stats, traits, abilities
+					`SELECT character_id, start_game_day, stats, traits, abilities
 					FROM player_quests JOIN sheets USING (player_id, quest_id)
 					WHERE player_id = ? AND quest_id = ?`,
 				)
@@ -161,7 +157,6 @@ export function openStorage(path: string): Storage {
 				questId,
 				sheet: {
 					abilities: JSON.parse(row.abilities),
-					health: row.health,
 					stats: JSON.parse(row.stats),
 					traits: JSON.parse(row.traits),
 				},
@@ -172,12 +167,9 @@ export function openStorage(path: string): Storage {
 			db.prepare(
 				'INSERT INTO player_quests (player_id, quest_id, character_id, start_game_day) VALUES (?, ?, ?, ?)',
 			).run(playerId, questId, characterId, startGameDay);
-			db.prepare(
-				'INSERT INTO sheets (player_id, quest_id, health, stats, traits, abilities) VALUES (?, ?, ?, ?, ?, ?)',
-			).run(
+			db.prepare('INSERT INTO sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?)').run(
 				playerId,
 				questId,
-				sheet.health,
 				JSON.stringify(sheet.stats),
 				JSON.stringify(sheet.traits),
 				JSON.stringify(sheet.abilities),

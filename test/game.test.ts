@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { basename, relative } from 'node:path';
+import { mkdtempDisposable } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { basename, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Button, Component } from '../src/components.ts';
 import { createGame, everyScreen, type Game, type Reply } from '../src/game.ts';
@@ -237,22 +239,28 @@ test('a Character with no Abilities says so', () => {
 test("choosing a Character starts the Quest on today's Game Day, with a Sheet of their starting Stats, Traits, and Abilities", () => {
 	const game = newGame();
 
-	const reply = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Choose this Character');
+	const tinker = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next');
+
+	const reply = press(game, tinker, 'Choose this Character');
 
 	assert.deepEqual(reply, {
 		components: [
 			{
 				components: [
 					{
-						content: '## The Clockwork Tower\nYou start as Iron Warden on Game Day November 13, 2026.',
+						content: '## The Clockwork Tower\nYou start as Tinker on Game Day November 13, 2026.',
 						type: 'textDisplay',
 					},
-					{ content: '**Stats**\nMax Health 14, Defense +4, Attack +3, Damage 2d4', type: 'textDisplay' },
+					{ content: '**Stats**\nMax Health 10, Defense +2, Attack +1, Damage d6', type: 'textDisplay' },
 					{
-						content: '**Traits**\nStrength +3, Dexterity +0, Constitution +2, Intellect -1, Wisdom +0, Charisma +1',
+						content: '**Traits**\nStrength -1, Dexterity +2, Constitution +0, Intellect +3, Wisdom +1, Charisma +0',
 						type: 'textDisplay',
 					},
-					{ content: '**Abilities**\n- Bulwark: Twice per Page: add +2 to a Defense roll.', type: 'textDisplay' },
+					{
+						content:
+							'**Abilities**\n- Gadgeteer: Once per Rest: add d4 to an Intellect roll.\n- Spare Parts: Add +1 to rolls to repair.',
+						type: 'textDisplay',
+					},
 					{ type: 'separator' },
 					{ content: '-# Use `/quest play` to play your first Page.', type: 'textDisplay' },
 				],
@@ -264,14 +272,14 @@ test("choosing a Character starts the Quest on today's Game Day, with a Sheet of
 
 test("a Quest started before midnight in the game's timezone starts on that Game Day, even after midnight UTC", () => {
 	const game = newGame();
-	// 10:30 PM on November 13 in New York.
-	const lateEvening = new Date('2026-11-14T03:30:00Z');
+	// 10:30 PM on November 20 in New York.
+	const lateEvening = new Date('2026-11-21T03:30:00Z');
 	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, lateEvening);
 	const characters = game.handle('player-1', 'server-1', { button: buttonsIn(quests)[1]!.id }, lateEvening).reply;
 
 	const { reply } = game.handle('player-1', 'server-1', { button: buttonsIn(characters)[0]!.id }, lateEvening);
 
-	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 13, 2026.');
+	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 20, 2026.');
 });
 
 /**
@@ -306,6 +314,17 @@ test('choosing a Quest the Player is already playing is refused before they pick
 	assert.deepEqual(again, ALREADY_PLAYING);
 });
 
+test('another Player can start a Quest someone else is already playing', () => {
+	const game = newGame();
+	press(game, chooseQuest(game, 'The Amber Road'), 'Choose this Character');
+	const { reply: quests } = game.handle('player-2', 'server-1', { command: 'quest start' }, NOW);
+	const characters = game.handle('player-2', 'server-1', { button: buttonsIn(quests)[1]!.id }, NOW).reply;
+
+	const { reply } = game.handle('player-2', 'server-1', { button: buttonsIn(characters)[0]!.id }, NOW);
+
+	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 13, 2026.');
+});
+
 test('a Quest started in one server is already being played in another server and outside any server', () => {
 	const game = newGame();
 	press(game, chooseQuest(game, 'The Amber Road', 'server-1'), 'Choose this Character', 'server-1');
@@ -321,6 +340,17 @@ test('a Player playing one Quest can start another', () => {
 	const reply = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Choose this Character');
 
 	assert.equal(textsIn(reply)[0], '## The Clockwork Tower\nYou start as Iron Warden on Game Day November 13, 2026.');
+});
+
+test('a Quest started before the bot restarts is still being played after it', async () => {
+	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
+	const path = join(dir.path, 'game.sqlite');
+	const before = createGame({ quests: QUESTS, storage: openStorage(path), timezone: 'America/New_York' });
+	press(before, chooseQuest(before, 'The Amber Road'), 'Choose this Character');
+
+	const after = createGame({ quests: QUESTS, storage: openStorage(path), timezone: 'America/New_York' });
+
+	assert.deepEqual(chooseQuest(after, 'The Amber Road'), ALREADY_PLAYING);
 });
 
 /**

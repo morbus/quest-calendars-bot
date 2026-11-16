@@ -306,7 +306,7 @@ function startQuest({ gameDay, playerId, storage }: Turn, quest: LoadedQuest, ch
 	storage.startQuest(playerId, {
 		characterId: character.id,
 		questId: quest.id,
-		sheet: { abilities, health: stats.maxHealth, stats, traits },
+		sheet: { abilities, stats, traits },
 		startGameDay: gameDay,
 	});
 	return showStarted(quest, storage.playerQuest(playerId, quest.id)!);
