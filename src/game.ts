@@ -9,9 +9,9 @@ import type { Image, Loaded, LoadedQuest } from './registry.ts';
 import type { PlayerQuest, Sheet, Storage } from './storage.ts';
 
 /**
- * A start whose Discord timestamp, ten digits of seconds, is as long as any until the year 2286.
+ * A start time for screens that look the same whenever the Player starts.
  */
-const LONGEST_START = new Date(9_999_999_999_000);
+const ANY_START = new Date(0);
 
 /**
  * The game rules, with no knowledge of Discord.
@@ -188,14 +188,14 @@ export function createGame({
 /**
  * Every screen of every Quest and Character, as Players see it, with where it is declared:
  * the Quest's file, and a Character's place and id in `characters`, so startup can check each fits in Discord.
- * A Character's screen once started shows the longest start time, so it fits whenever they start.
+ * A Character's screen once started looks the same whenever they start.
  */
 export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: string }[] {
 	return quests.flatMap((quest, index) => [
 		{ reply: showQuest(quests, index), source: quest.file },
 		...quest.characters.flatMap((character, i) => {
 			const source = `${quest.file}: characters[${i}] (${character.id})`;
-			const started = startedQuest(quest, character, gameDay(LONGEST_START, 'UTC'), LONGEST_START);
+			const started = startedQuest(quest, character, gameDay(ANY_START, 'UTC'), ANY_START);
 			return [
 				{ reply: showCharacter(quest, i), source },
 				{ reply: showStarted(quest, character, started), source: `${source}, once started` },
@@ -288,24 +288,15 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 }
 
 /**
- * Shows the Quest the Player just started: the Character they picked, their Sheet, and their progress,
- * with when they started in Discord's timestamp, which each Player sees in their own timezone.
+ * Shows the Quest the Player just started: the Character they picked and their Sheet.
  */
-function showStarted(
-	quest: LoadedQuest,
-	character: Loaded<Character>,
-	{ backlog, pagesPlayed, sheet, started }: PlayerQuest,
-): Reply {
-	const startedAt = `<t:${Math.floor(Date.parse(started) / 1000)}:f>`;
+function showStarted(quest: LoadedQuest, character: Loaded<Character>, { sheet }: PlayerQuest): Reply {
 	return {
 		components: [
 			card(
 				{ name: quest.name },
 				`You start as ${character.name}. Your first Page is ready.`,
-				[
-					...characterDetails(sheet),
-					text(`**Progress**\nBacklog ${backlog}, Pages played ${pagesPlayed}, Started ${startedAt}`),
-				],
+				characterDetails(sheet),
 				'Use `/quest play` to play it.',
 			),
 		],

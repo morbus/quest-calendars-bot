@@ -261,7 +261,6 @@ test('choosing a Character starts the Quest with one Page in the Backlog, and a 
 							'**Abilities**\n- Gadgeteer: Once per Rest: add d4 to an Intellect roll.\n- Spare Parts: Add +1 to rolls to repair.',
 						type: 'textDisplay',
 					},
-					{ content: '**Progress**\nBacklog 1, Pages played 0, Started <t:1794560400:f>', type: 'textDisplay' },
 					{ type: 'separator' },
 					{ content: '-# Use `/quest play` to play it.', type: 'textDisplay' },
 				],
@@ -269,17 +268,6 @@ test('choosing a Character starts the Quest with one Page in the Backlog, and a 
 			},
 		],
 	});
-});
-
-test('a Quest started partway through a second shows its start time in whole seconds', () => {
-	const game = newGame();
-	const partway = new Date('2026-11-13T09:00:00.999Z');
-	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, partway);
-	const characters = game.handle('player-1', 'server-1', { button: buttonsIn(quests)[1]!.id }, partway).reply;
-
-	const { reply } = game.handle('player-1', 'server-1', { button: buttonsIn(characters)[0]!.id }, partway);
-
-	assert.ok(textsIn(reply).includes('**Progress**\nBacklog 1, Pages played 0, Started <t:1794560400:f>'));
 });
 
 /**
@@ -458,20 +446,11 @@ test('every screen of every Quest and Character is listed with where it is decla
 	assert.deepEqual(screens[6]?.reply, press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next'));
 });
 
-test("a Character's screen once started is listed as it shows at the latest start with a ten-digit Discord timestamp", () => {
+test("a Character's screen once started is listed as it shows whenever they start", () => {
 	const game = newGame();
-	// The last second, in the year 2286, whose Discord timestamp has ten digits.
-	const latest = new Date(9_999_999_999_000);
-	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, latest);
-	const towerQuest = game.handle(
-		'player-1',
-		'server-1',
-		{ button: buttonsIn(press(game, quests, 'Next'))[1]!.id },
-		latest,
-	).reply;
-	const tinker = press(game, towerQuest, 'Next');
+	const tinker = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next');
 
-	const started = game.handle('player-1', 'server-1', { button: buttonsIn(tinker)[1]!.id }, latest).reply;
+	const started = press(game, tinker, 'Choose this Character');
 
 	assert.deepEqual(everyScreen(QUESTS)[7]?.reply, started);
 });
