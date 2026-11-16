@@ -222,15 +222,18 @@ function pressButton(context: InputContext, button: string): Reply {
 		if (!/^\d+$/.test(digits ?? '') || index >= items.length) throw unknown;
 		return index;
 	};
+	// A Quest the Player is already playing shows nothing on the way to starting it again.
+	const unlessPlaying = (quest: LoadedQuest, show: () => Reply): Reply =>
+		storage.playerQuest(playerId, quest.id) === undefined ? show() : alreadyPlaying(quest);
 	const browsing = kind === 'prev' || kind === 'next';
 	if (kind === 'quest' && args.length === 1) {
 		const quest = questWithId(args[0]);
-		return storage.playerQuest(playerId, quest.id) === undefined ? showCharacter(quest, 0) : alreadyPlaying(quest);
+		return unlessPlaying(quest, () => showCharacter(quest, 0));
 	}
 	if (browsing && args[0] === 'quests' && args.length === 2) return showQuest(quests, indexIn(args[1], quests));
 	if (browsing && args[0] === 'characters' && args.length === 3) {
 		const quest = questWithId(args[1]);
-		return showCharacter(quest, indexIn(args[2], quest.characters));
+		return unlessPlaying(quest, () => showCharacter(quest, indexIn(args[2], quest.characters)));
 	}
 	if (kind === 'character' && args.length === 2) {
 		const quest = questWithId(args[0]);

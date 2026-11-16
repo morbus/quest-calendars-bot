@@ -325,6 +325,18 @@ test('another Player can start a Quest someone else is already playing', () => {
 	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 13, 2026.');
 });
 
+test('moving through the Characters of a Quest the Player is already playing is refused', () => {
+	const game = newGame();
+	const characters = chooseQuest(game, 'The Clockwork Tower');
+	press(game, characters, 'Choose this Character');
+
+	const next = press(game, characters, 'Next');
+
+	assert.deepEqual(textsIn(next), [
+		"You're already playing The Clockwork Tower. Use `/quest play` to play your next Page, or `/quest abandon` to wipe it and start again.",
+	]);
+});
+
 test('a Quest started in one server is already being played in another server and outside any server', () => {
 	const game = newGame();
 	press(game, chooseQuest(game, 'The Amber Road', 'server-1'), 'Choose this Character', 'server-1');
