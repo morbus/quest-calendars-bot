@@ -72,7 +72,7 @@ function buttonStates(reply: Reply): { disabled: boolean; label: string }[] {
  * A Game with in-memory storage and the given Quests.
  */
 function newGame(quests: LoadedQuest[] = QUESTS): Game {
-	return createGame({ quests, storage: openStorage(':memory:') });
+	return createGame({ quests, storage: openStorage(':memory:'), timezone: 'America/New_York' });
 }
 
 test('/quest start shows the first Quest on its own, with buttons to choose it or move through the rest', () => {
@@ -233,12 +233,44 @@ test('a Character with no Abilities says so', () => {
 	assert.ok(textsIn(reply).includes('**Abilities**\nnone'));
 });
 
-test('choosing a Character says starting a Quest is coming soon', () => {
+test("choosing a Character starts the Quest on today's Game Day, with a Sheet of their starting Stats, Traits, and Abilities", () => {
 	const game = newGame();
 
-	const reply = press(game, chooseQuest(game, 'The Amber Road'), 'Choose this Character');
+	const reply = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Choose this Character');
 
-	assert.deepEqual(reply, { components: [{ content: 'Starting a Quest is coming soon.', type: 'textDisplay' }] });
+	assert.deepEqual(reply, {
+		components: [
+			{
+				components: [
+					{
+						content: '## The Clockwork Tower\nYou start as Iron Warden on Game Day November 13, 2026.',
+						type: 'textDisplay',
+					},
+					{ content: '**Stats**\nMax Health 14, Defense +4, Attack +3, Damage 2d4', type: 'textDisplay' },
+					{
+						content: '**Traits**\nStrength +3, Dexterity +0, Constitution +2, Intellect -1, Wisdom +0, Charisma +1',
+						type: 'textDisplay',
+					},
+					{ content: '**Abilities**\n- Bulwark: Twice per Page: add +2 to a Defense roll.', type: 'textDisplay' },
+					{ type: 'separator' },
+					{ content: '-# Use `/quest play` to play your first Page.', type: 'textDisplay' },
+				],
+				type: 'container',
+			},
+		],
+	});
+});
+
+test("a Quest started before midnight in the game's timezone starts on that Game Day, even after midnight UTC", () => {
+	const game = newGame();
+	// 10:30 PM on November 13 in New York.
+	const lateEvening = new Date('2026-11-14T03:30:00Z');
+	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, lateEvening);
+	const characters = game.handle('player-1', 'server-1', { button: buttonsIn(quests)[1]!.id }, lateEvening).reply;
+
+	const { reply } = game.handle('player-1', 'server-1', { button: buttonsIn(characters)[0]!.id }, lateEvening);
+
+	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 13, 2026.');
 });
 
 /**
@@ -260,9 +292,10 @@ test('an old Choose this Character button still chooses the same Character after
 	const after = newGame(questsWithTowerCharacters((name) => name === 'Tinker'));
 	const gone = newGame(questsWithTowerCharacters((name) => name !== 'Tinker'));
 
-	assert.deepEqual(after.handle('player-1', 'server-1', { button: choose }, NOW).reply, {
-		components: [{ content: 'Starting a Quest is coming soon.', type: 'textDisplay' }],
-	});
+	assert.equal(
+		textsIn(after.handle('player-1', 'server-1', { button: choose }, NOW).reply)[0],
+		'## The Clockwork Tower\nYou start as Tinker on Game Day November 13, 2026.',
+	);
 	assert.throws(() => gone.handle('player-1', 'server-1', { button: choose }, NOW), /Unknown button/);
 });
 

@@ -96,7 +96,7 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	await startBot({ game: createGame({ quests, storage }), token });
+	await startBot({ game: createGame({ quests, storage, timezone }), token });
 }
 
 main().catch((error) => {

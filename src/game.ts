@@ -3,9 +3,10 @@
  */
 
 import { TRAITS, type Character } from './builder.ts';
+import { gameDay } from './calendar.ts';
 import type { ActionRow, Button, Component, TextDisplay } from './components.ts';
 import type { Image, Loaded, LoadedQuest } from './registry.ts';
-import type { Storage } from './storage.ts';
+import type { PlayerQuest, Storage } from './storage.ts';
 
 /**
  * The game rules, with no knowledge of Discord.
@@ -51,6 +52,31 @@ export type Result = {
 };
 
 /**
+ * What one Input runs with.
+ */
+type Turn = {
+	/**
+	 * The Game Day the Input arrived on.
+	 */
+	gameDay: string;
+
+	/**
+	 * The Discord user ID of the Player who sent it.
+	 */
+	playerId: string;
+
+	/**
+	 * Every loaded Quest.
+	 */
+	quests: LoadedQuest[];
+
+	/**
+	 * Holds every Player's Quests and Sheets.
+	 */
+	storage: Storage;
+};
+
+/**
  * Browse a list of "Choose"-able items, with "Previous" and "Next" buttons that
  * wraparound. If the list only contains item, "Previous" and "Next" aren't shown.
  */
@@ -80,7 +106,7 @@ function card(
 	{ image, name }: { image?: Image; name: string },
 	description: string,
 	details: TextDisplay[],
-	position: string,
+	footer: string,
 ): Component {
 	return {
 		components: [
@@ -88,16 +114,20 @@ function card(
 			text(`## ${name}\n${description}`),
 			...details,
 			{ type: 'separator' },
-			text(`-# ${position}`),
+			text(`-# ${footer}`),
 		],
 		type: 'container',
 	};
 }
 
 /**
- * A Character's Stats, Traits, and Abilities, a text each under a bold name.
+ * A Character's or Sheet's Stats, Traits, and Abilities, a text each under a bold name.
  */
-function characterDetails({ abilities, stats, traits }: Loaded<Character>): TextDisplay[] {
+function characterDetails({
+	abilities,
+	stats,
+	traits,
+}: Pick<Character, 'abilities' | 'stats' | 'traits'>): TextDisplay[] {
 	const abilityLines = abilities.map((ability) => `- ${ability.name}: ${ability.text}`);
 	return [
 		text(
@@ -113,13 +143,22 @@ function characterDetails({ abilities, stats, traits }: Loaded<Character>): Text
  *
  * @param quests - Every loaded Quest.
  * @param storage - Holds every Player's Quests and Sheets.
+ * @param timezone - The IANA timezone whose midnight starts each Game Day, such as "America/New_York".
  */
-export function createGame({ quests, storage }: { quests: LoadedQuest[]; storage: Storage }): Game {
+export function createGame({
+	quests,
+	storage,
+	timezone,
+}: {
+	quests: LoadedQuest[];
+	storage: Storage;
+	timezone: string;
+}): Game {
 	return {
-		handle(_playerId, _serverId, input, _now) {
+		handle(playerId, _serverId, input, now) {
 			return storage.transaction(() => {
 				if ('command' in input) return { reply: showQuest(quests, 0) };
-				return { reply: pressButton(quests, input.button) };
+				return { reply: pressButton({ gameDay: gameDay(now, timezone), playerId, quests, storage }, input.button) };
 			});
 		},
 	};
@@ -140,11 +179,11 @@ export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: stri
 }
 
 /**
- * What pressing the button with id `button` shows.
+ * What pressing the button with id `button` does, and shows.
  *
  * @throws When no button has that id, such as one left from before the Quests changed.
  */
-function pressButton(quests: LoadedQuest[], button: string): Reply {
+function pressButton({ quests, ...turn }: Turn, button: string): Reply {
 	const [kind, ...args] = button.split(':');
 	const unknown = new Error(`Unknown button: ${button}`);
 	const questWithId = (id: string | undefined): LoadedQuest => {
@@ -165,8 +204,10 @@ function pressButton(quests: LoadedQuest[], button: string): Reply {
 		return showCharacter(quest, indexIn(args[2], quest.characters));
 	}
 	if (kind === 'character' && args.length === 2) {
-		if (!questWithId(args[0]).characters.some((character) => character.id === args[1])) throw unknown;
-		return { components: [text('Starting a Quest is coming soon.')] };
+		const quest = questWithId(args[0]);
+		const character = quest.characters.find((character) => character.id === args[1]);
+		if (character === undefined) throw unknown;
+		return startQuest({ quests, ...turn }, quest, character);
 	}
 	throw unknown;
 }
@@ -214,10 +255,43 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 }
 
 /**
+ * Shows the Quest the Player just started: the Character they picked, the Game Day they started on, and their Sheet.
+ */
+function showStarted(quest: LoadedQuest, { characterId, sheet, startGameDay }: PlayerQuest): Reply {
+	const character = quest.characters.find((character) => character.id === characterId)!;
+	const day = new Date(`${startGameDay}T00:00:00Z`).toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'UTC' });
+	return {
+		components: [
+			card(
+				{ name: quest.name },
+				`You start as ${character.name} on Game Day ${day}.`,
+				characterDetails(sheet),
+				'Use `/quest play` to play your first Page.',
+			),
+		],
+	};
+}
+
+/**
  * A modifier with its sign, such as "+2", "+0", or "-1".
  */
 function signed(modifier: number): string {
 	return modifier < 0 ? `${modifier}` : `+${modifier}`;
+}
+
+/**
+ * Starts `quest` for the Player as `character`, on today's Game Day, with a Sheet of the Character's
+ * starting Stats, Traits, and Abilities, and shows it.
+ */
+function startQuest({ gameDay, playerId, storage }: Turn, quest: LoadedQuest, character: Loaded<Character>): Reply {
+	const { abilities, stats, traits } = character;
+	storage.startQuest(playerId, {
+		characterId: character.id,
+		questId: quest.id,
+		sheet: { abilities, health: stats.maxHealth, stats, traits },
+		startGameDay: gameDay,
+	});
+	return showStarted(quest, storage.playerQuest(playerId, quest.id)!);
 }
 
 /**
