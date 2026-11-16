@@ -5,7 +5,7 @@
 import { TRAITS, type Character } from './builder.ts';
 import type { ActionRow, Button, Component, TextDisplay } from './components.ts';
 import type { Image, Loaded, LoadedQuest } from './registry.ts';
-import type { PlayerQuest, Sheet, Storage } from './storage.ts';
+import type { CharacterSheet, PlayerQuest, Storage } from './storage.ts';
 
 /**
  * A start time for screens that look the same whenever the Player starts.
@@ -57,7 +57,7 @@ type InputContext = {
 	quests: LoadedQuest[];
 
 	/**
-	 * Holds every Player's Quests and Sheets.
+	 * Holds every Player's Quests and Character Sheets.
 	 */
 	storage: Storage;
 };
@@ -143,9 +143,9 @@ function card(
 }
 
 /**
- * A Sheet's Stats, Traits, and Abilities, or a Character's starting ones, a text each under a bold name.
+ * A Character Sheet's Stats, Traits, and Abilities, or a Character's starting ones, a text each under a bold name.
  */
-function characterDetails({ abilities, stats, traits }: Sheet): TextDisplay[] {
+function characterDetails({ abilities, stats, traits }: CharacterSheet): TextDisplay[] {
 	const abilityLines = abilities.map((ability) => `- ${ability.name}: ${ability.text}`);
 	return [
 		text(
@@ -160,7 +160,7 @@ function characterDetails({ abilities, stats, traits }: Sheet): TextDisplay[] {
  * Creates the Game.
  *
  * @param quests - Every loaded Quest.
- * @param storage - Holds every Player's Quests and Sheets.
+ * @param storage - Holds every Player's Quests and Character Sheets.
  * @param timezone - The IANA timezone whose midnight starts each Game Day, such as "America/New_York".
  */
 export function createGame({
@@ -301,15 +301,15 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 }
 
 /**
- * Shows the Quest the Player just started: the Character they picked, with their image, and their Sheet.
+ * Shows the Quest the Player just started: the Character they picked, with their image, and their Character Sheet.
  */
-function showStarted(quest: LoadedQuest, character: Loaded<Character>, { sheet }: PlayerQuest): Reply {
+function showStarted(quest: LoadedQuest, character: Loaded<Character>, { characterSheet }: PlayerQuest): Reply {
 	return {
 		components: [
 			card(
 				{ image: character.image, name: quest.name },
 				`You start as ${character.name}. Your first Page is ready.`,
-				characterDetails(sheet),
+				characterDetails(characterSheet),
 				'Use `/quest play` to play it.',
 			),
 		],
@@ -325,7 +325,7 @@ function signed(modifier: number): string {
 
 /**
  * `quest` as started by a Player as `character` at `now`, on the Game Day `startGameDay`: its first Page
- * in their Backlog, none played yet, and a Sheet of the Character's starting Stats, Traits, and Abilities.
+ * in their Backlog, none played yet, and a Character Sheet of the Character's starting Stats, Traits, and Abilities.
  */
 function startedQuest(quest: LoadedQuest, character: Loaded<Character>, startGameDay: string, now: Date): PlayerQuest {
 	const { abilities, stats, traits } = character;
@@ -333,17 +333,17 @@ function startedQuest(quest: LoadedQuest, character: Loaded<Character>, startGam
 		backlogCount: 1,
 		backlogUpdated: startGameDay,
 		characterId: character.id,
+		characterSheet: { abilities, stats, traits },
 		lastPlayed: null,
 		pagesPlayed: 0,
 		questId: quest.id,
-		sheet: { abilities, stats, traits },
 		started: now.toISOString(),
 	};
 }
 
 /**
  * Starts `quest` for the Player as `character`, now, with its first Page in their Backlog
- * and a Sheet of the Character's starting Stats, Traits, and Abilities, and shows it.
+ * and a Character Sheet of the Character's starting Stats, Traits, and Abilities, and shows it.
  */
 function startQuest(
 	{ gameDay, now, playerId, storage }: InputContext,

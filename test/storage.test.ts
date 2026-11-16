@@ -66,11 +66,11 @@ test('a migration that fails partway leaves the database as it was, so it can be
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
 	const old = new DatabaseSync(path);
-	old.exec('CREATE TABLE player_sheets (note TEXT)');
+	old.exec('CREATE TABLE character_sheets (note TEXT)');
 
-	assert.throws(() => openStorage(path), /table player_sheets already exists/);
+	assert.throws(() => openStorage(path), /table character_sheets already exists/);
 
-	old.exec('DROP TABLE player_sheets');
+	old.exec('DROP TABLE character_sheets');
 	old.close();
 	assert.doesNotThrow(() => openStorage(path));
 });
@@ -82,14 +82,14 @@ const AMBER_ROAD: PlayerQuest = {
 	backlogCount: 1,
 	backlogUpdated: '2026-11-13',
 	characterId: 'pilgrim',
-	lastPlayed: null,
-	pagesPlayed: 0,
-	questId: 'amber-road',
-	sheet: {
+	characterSheet: {
 		abilities: [],
 		stats: { attack: 0, damage: 'd4', defense: 1, maxHealth: 8 },
 		traits: { strength: 0, dexterity: 0, constitution: 1, intellect: 0, wisdom: 2, charisma: 1 },
 	},
+	lastPlayed: null,
+	pagesPlayed: 0,
+	questId: 'amber-road',
 	started: '2026-11-13T09:00:00.000Z',
 };
 
@@ -103,27 +103,33 @@ test('a Player cannot start a Quest they are already playing', () => {
 	);
 });
 
-test("a Player's Quest without its Sheet is an error, not a Quest they aren't playing", async () => {
+test("a Player's Quest without its Character Sheet is an error, not a Quest they aren't playing", async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
 	const storage = openStorage(path);
 	storage.transaction(() => storage.startQuest('player-1', AMBER_ROAD));
 	const db = new DatabaseSync(path);
-	db.exec("DELETE FROM player_sheets WHERE player_id = 'player-1'");
+	db.exec("DELETE FROM character_sheets WHERE player_id = 'player-1'");
 	db.close();
 
-	assert.throws(() => storage.playerQuest('player-1', 'amber-road'), /player-1's amber-road Quest has no Sheet/);
+	assert.throws(
+		() => storage.playerQuest('player-1', 'amber-road'),
+		/player-1's amber-road Quest has no Character Sheet/,
+	);
 });
 
-test("a Player's Sheet without its Quest is an error, not a Quest they aren't playing", async () => {
+test("a Player's Character Sheet without its Quest is an error, not a Quest they aren't playing", async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
 	const storage = openStorage(path);
 	storage.transaction(() => storage.startQuest('player-1', AMBER_ROAD));
-	// With foreign keys off, as in the sqlite3 shell, deleting the Quest leaves its Sheet behind.
+	// With foreign keys off, as in the sqlite3 shell, deleting the Quest leaves its Character Sheet behind.
 	const db = new DatabaseSync(path, { enableForeignKeyConstraints: false });
 	db.exec("DELETE FROM player_quests WHERE player_id = 'player-1'");
 	db.close();
 
-	assert.throws(() => storage.playerQuest('player-1', 'amber-road'), /player-1's amber-road Sheet has no Quest/);
+	assert.throws(
+		() => storage.playerQuest('player-1', 'amber-road'),
+		/player-1's amber-road Character Sheet has no Quest/,
+	);
 });

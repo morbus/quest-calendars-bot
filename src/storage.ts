@@ -31,7 +31,7 @@ const MIGRATIONS = [
 		backlog_updated TEXT NOT NULL,
 		PRIMARY KEY (player_id, quest_id)
 	) STRICT;
-	CREATE TABLE player_sheets (
+	CREATE TABLE character_sheets (
 		player_id TEXT NOT NULL,
 		quest_id TEXT NOT NULL,
 		stats TEXT NOT NULL,
@@ -62,6 +62,11 @@ export type PlayerQuest = {
 	characterId: string;
 
 	/**
+	 * The Player's Character Sheet in the Quest.
+	 */
+	characterSheet: CharacterSheet;
+
+	/**
 	 * When the Player last played a Page, as a UTC timestamp such as
 	 * "2026-11-13T09:00:00.000Z", or `null` before they play their first.
 	 */
@@ -78,23 +83,18 @@ export type PlayerQuest = {
 	questId: string;
 
 	/**
-	 * The Player's Sheet in the Quest.
-	 */
-	sheet: Sheet;
-
-	/**
 	 * When the Player started the Quest, as a UTC timestamp such as "2026-11-13T09:00:00.000Z".
 	 */
 	started: string;
 };
 
 /**
- * A {@link PlayerQuest} as {@link Storage.playerQuest} reads it, with its Sheet's Stats, Traits, and Abilities as JSON,
- * or `null` when the Quest has no Sheet.
+ * A {@link PlayerQuest} as {@link Storage.playerQuest} reads it, with its Character Sheet's Stats, Traits, and Abilities as JSON,
+ * or `null` when the Quest has no Character Sheet.
  */
 type PlayerQuestRow = {
 	/**
-	 * The Sheet's Abilities, as JSON.
+	 * The Character Sheet's Abilities, as JSON.
 	 */
 	abilities: string | null;
 
@@ -129,12 +129,12 @@ type PlayerQuestRow = {
 	started: string;
 
 	/**
-	 * The Sheet's Stats, as JSON.
+	 * The Character Sheet's Stats, as JSON.
 	 */
 	stats: string | null;
 
 	/**
-	 * The Sheet's Traits, as JSON.
+	 * The Character Sheet's Traits, as JSON.
 	 */
 	traits: string | null;
 };
@@ -142,7 +142,7 @@ type PlayerQuestRow = {
 /**
  * The current state of one Player's Character in one Quest.
  */
-export type Sheet = {
+export type CharacterSheet = {
 	/**
 	 * The Abilities, in the order Players see them.
 	 */
@@ -166,14 +166,14 @@ export type Storage = {
 	/**
 	 * The Quest with id `questId` that the Player with Discord user ID `playerId` is playing, if they are.
 	 *
-	 * @throws When the game state is damaged: they are playing it but it has no Sheet,
-	 * or they aren't playing it but its Sheet was left behind.
+	 * @throws When the game state is damaged: they are playing it but it has no Character Sheet,
+	 * or they aren't playing it but its Character Sheet was left behind.
 	 */
 	playerQuest(playerId: string, questId: string): PlayerQuest | undefined;
 
 	/**
 	 * Records that the Player with Discord user ID `playerId` started `playerQuest`.
-	 * Call it inside {@link Storage.transaction}, so the Quest and its Sheet are written together.
+	 * Call it inside {@link Storage.transaction}, so the Quest and its Character Sheet are written together.
 	 *
 	 * @throws When they are already playing it.
 	 */
@@ -226,40 +226,40 @@ export function openStorage(path: string): Storage {
 			const row = db
 				.prepare(
 					`SELECT character_id, started, last_played, pages_played, backlog_count, backlog_updated, stats, traits, abilities
-					FROM player_quests LEFT JOIN player_sheets USING (player_id, quest_id)
+					FROM player_quests LEFT JOIN character_sheets USING (player_id, quest_id)
 					WHERE player_id = ? AND quest_id = ?`,
 				)
 				.get(playerId, questId) as PlayerQuestRow | undefined;
-			// startQuest writes both in one transaction, so a Quest without its Sheet, or a Sheet
+			// startQuest writes both in one transaction, so a Quest without its Character Sheet, or a Character Sheet
 			// without its Quest, means the game state was damaged.
 			if (row === undefined) {
-				const leftoverSheet = db
-					.prepare('SELECT 1 FROM player_sheets WHERE player_id = ? AND quest_id = ?')
+				const leftoverCharacterSheet = db
+					.prepare('SELECT 1 FROM character_sheets WHERE player_id = ? AND quest_id = ?')
 					.get(playerId, questId);
-				if (leftoverSheet !== undefined) throw damaged(playerId, questId, 'Sheet has no Quest');
+				if (leftoverCharacterSheet !== undefined) throw damaged(playerId, questId, 'Character Sheet has no Quest');
 				return undefined;
 			}
 			if (row.stats === null || row.traits === null || row.abilities === null) {
-				throw damaged(playerId, questId, 'Quest has no Sheet');
+				throw damaged(playerId, questId, 'Quest has no Character Sheet');
 			}
 			return {
 				backlogCount: row.backlog_count,
 				backlogUpdated: row.backlog_updated,
 				characterId: row.character_id,
-				lastPlayed: row.last_played,
-				pagesPlayed: row.pages_played,
-				questId,
-				sheet: {
+				characterSheet: {
 					abilities: JSON.parse(row.abilities),
 					stats: JSON.parse(row.stats),
 					traits: JSON.parse(row.traits),
 				},
+				lastPlayed: row.last_played,
+				pagesPlayed: row.pages_played,
+				questId,
 				started: row.started,
 			};
 		},
 		startQuest(
 			playerId,
-			{ backlogCount, backlogUpdated, characterId, lastPlayed, pagesPlayed, questId, sheet, started },
+			{ backlogCount, backlogUpdated, characterId, characterSheet, lastPlayed, pagesPlayed, questId, started },
 		) {
 			db.prepare(
 				`INSERT INTO player_quests
@@ -267,13 +267,13 @@ export function openStorage(path: string): Storage {
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			).run(playerId, questId, characterId, started, lastPlayed, pagesPlayed, backlogCount, backlogUpdated);
 			db.prepare(
-				'INSERT INTO player_sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?)',
+				'INSERT INTO character_sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?)',
 			).run(
 				playerId,
 				questId,
-				JSON.stringify(sheet.stats),
-				JSON.stringify(sheet.traits),
-				JSON.stringify(sheet.abilities),
+				JSON.stringify(characterSheet.stats),
+				JSON.stringify(characterSheet.traits),
+				JSON.stringify(characterSheet.abilities),
 			);
 		},
 		transaction(work) {

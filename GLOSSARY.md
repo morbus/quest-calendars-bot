@@ -39,13 +39,13 @@ _Avoid_: Power, skill, special ability.
 **Rest**:
 A break in which the **Character** recovers, either because a **Page** grants one or because the **Player**
 uses a limited item to take one at the start or end of a **Page**. It refills Health, Spell Points, and per-Rest
-**Abilities** on the **Sheet**, clears conditions such as Poisoned, and allows changing equipment and crafting.
+**Abilities** on the **Character Sheet**, clears conditions such as Poisoned, and allows changing equipment and crafting.
 _Avoid_: Camp, long rest, recovery.
 
-**Sheet**:
+**Character Sheet**:
 The current state of one **Player**'s **Character** in one **Quest**: **Stats**,
 **Traits**, **Abilities**, **Currency**, **Reputation**, equipment, items, and conditions.
-_Avoid_: Character sheet, profile.
+_Avoid_: Sheet, profile.
 
 **Currency**:
 The one kind of money a **Quest** uses, named by that **Quest**
@@ -69,13 +69,13 @@ roll falls in: prose plus **Effects**, and sometimes further **Actions** or **Ch
 _Avoid_: Resolution, result.
 
 **Effect**:
-One change an **Outcome** makes to the **Sheet** or to later rolls, such as losing Health, gaining **Currency**
+One change an **Outcome** makes to the **Character Sheet** or to later rolls, such as losing Health, gaining **Currency**
 or an item, a bonus on the next **Action** or the next **Page**, or a **Note**. "Tomorrow" in **Page** text
 means the **Player**'s next **Page** in that **Quest**, not the next **Game Day**.
 _Avoid_: Consequence, modifier.
 
 **Note**:
-A named marker an **Outcome** writes on the **Sheet**
+A named marker an **Outcome** writes on the **Character Sheet**
 (e.g. "Chunk of Amber") so that later **Pages** can check for it.
 _Avoid_: Flag, "written down".
 
@@ -109,7 +109,7 @@ An optional set of game mechanics, such as the Crafting or Minions,, that a **Qu
 ## Relationships
 
 - A **Player** may play multiple **Quests** at once, each from its own first **Page**, and their progress is the same on every Discord server.
-- A **Player** picks one of a **Quest**'s **Characters** when starting it, and has one **Sheet** per **Quest**.
+- A **Player** picks one of a **Quest**'s **Characters** when starting it, and has one **Character Sheet** per **Quest**.
 - A **Page** contains one or more **Actions**, some grouped into **Choices**.
 - A **Quest** contains many **Pages** in a fixed order.
 - Each **Game Day** adds one **Page** to the **Player**'s **Backlog** for each **Quest** they are playing, up to 14.
