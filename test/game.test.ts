@@ -100,13 +100,13 @@ test('/quest start shows the first Quest on its own, with buttons to choose it o
 });
 
 /**
- * Presses the button labeled `label` in `reply`, and returns what the Player sees next.
+ * Presses the button labeled `label` in `reply`, from the server `serverId`, and returns what the Player sees next.
  */
-function press(game: Game, reply: Reply, label: string): Reply {
+function press(game: Game, reply: Reply, label: string, serverId: string | null = 'server-1'): Reply {
 	const button = buttonsIn(reply).find((button) => button.label === label);
 	assert.ok(button, `no button labeled ${label}`);
 	assert.ok(!button.disabled, `${label} is disabled`);
-	return game.handle('player-1', 'server-1', { button: button.id }, NOW).reply;
+	return game.handle('player-1', serverId, { button: button.id }, NOW).reply;
 }
 
 test('Next shows the next Quest, with its image, and Previous goes back', () => {
@@ -144,12 +144,13 @@ test('Previous on the first Quest wraps around to the last, and Next on the last
 });
 
 /**
- * Moves through `/quest start` to the Quest named `name`, chooses it, and returns what the Player sees.
+ * Moves through `/quest start`, from the server `serverId`, to the Quest named `name`,
+ * chooses it, and returns what the Player sees.
  */
-function chooseQuest(game: Game, name: string): Reply {
-	let { reply } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
-	while (!textsIn(reply).some((text) => text.startsWith(`## ${name}\n`))) reply = press(game, reply, 'Next');
-	return press(game, reply, 'Choose this Quest');
+function chooseQuest(game: Game, name: string, serverId: string | null = 'server-1'): Reply {
+	let { reply } = game.handle('player-1', serverId, { command: 'quest start' }, NOW);
+	while (!textsIn(reply).some((text) => text.startsWith(`## ${name}\n`))) reply = press(game, reply, 'Next', serverId);
+	return press(game, reply, 'Choose this Quest', serverId);
 }
 
 test('choosing a Quest shows its first Character on its own, with their Stats, Traits, and Abilities', () => {
@@ -271,6 +272,55 @@ test("a Quest started before midnight in the game's timezone starts on that Game
 	const { reply } = game.handle('player-1', 'server-1', { button: buttonsIn(characters)[0]!.id }, lateEvening);
 
 	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim on Game Day November 13, 2026.');
+});
+
+/**
+ * What starting The Amber Road shows when the Player is already playing it.
+ */
+const ALREADY_PLAYING: Reply = {
+	components: [
+		{
+			content:
+				"You're already playing The Amber Road. Use `/quest play` to play your next Page, or `/quest abandon` to wipe it and start again.",
+			type: 'textDisplay',
+		},
+	],
+};
+
+test('choosing a Character in a Quest the Player is already playing is refused', () => {
+	const game = newGame();
+	const characters = chooseQuest(game, 'The Amber Road');
+	press(game, characters, 'Choose this Character');
+
+	const again = press(game, characters, 'Choose this Character');
+
+	assert.deepEqual(again, ALREADY_PLAYING);
+});
+
+test('choosing a Quest the Player is already playing is refused before they pick a Character', () => {
+	const game = newGame();
+	press(game, chooseQuest(game, 'The Amber Road'), 'Choose this Character');
+
+	const again = chooseQuest(game, 'The Amber Road');
+
+	assert.deepEqual(again, ALREADY_PLAYING);
+});
+
+test('a Quest started in one server is already being played in another server and outside any server', () => {
+	const game = newGame();
+	press(game, chooseQuest(game, 'The Amber Road', 'server-1'), 'Choose this Character', 'server-1');
+
+	assert.deepEqual(chooseQuest(game, 'The Amber Road', 'server-2'), ALREADY_PLAYING);
+	assert.deepEqual(chooseQuest(game, 'The Amber Road', null), ALREADY_PLAYING);
+});
+
+test('a Player playing one Quest can start another', () => {
+	const game = newGame();
+	press(game, chooseQuest(game, 'The Amber Road'), 'Choose this Character');
+
+	const reply = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Choose this Character');
+
+	assert.equal(textsIn(reply)[0], '## The Clockwork Tower\nYou start as Iron Warden on Game Day November 13, 2026.');
 });
 
 /**

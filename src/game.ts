@@ -77,6 +77,19 @@ type Turn = {
 };
 
 /**
+ * Refuses to start `quest` again for a Player already playing it, pointing them to what they can do instead.
+ */
+function alreadyPlaying(quest: LoadedQuest): Reply {
+	return {
+		components: [
+			text(
+				`You're already playing ${quest.name}. Use \`/quest play\` to play your next Page, or \`/quest abandon\` to wipe it and start again.`,
+			),
+		],
+	};
+}
+
+/**
  * Browse a list of "Choose"-able items, with "Previous" and "Next" buttons that
  * wraparound. If the list only contains item, "Previous" and "Next" aren't shown.
  */
@@ -183,7 +196,8 @@ export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: stri
  *
  * @throws When no button has that id, such as one left from before the Quests changed.
  */
-function pressButton({ quests, ...turn }: Turn, button: string): Reply {
+function pressButton(turn: Turn, button: string): Reply {
+	const { playerId, quests, storage } = turn;
 	const [kind, ...args] = button.split(':');
 	const unknown = new Error(`Unknown button: ${button}`);
 	const questWithId = (id: string | undefined): LoadedQuest => {
@@ -197,7 +211,10 @@ function pressButton({ quests, ...turn }: Turn, button: string): Reply {
 		return index;
 	};
 	const browsing = kind === 'prev' || kind === 'next';
-	if (kind === 'quest' && args.length === 1) return showCharacter(questWithId(args[0]), 0);
+	if (kind === 'quest' && args.length === 1) {
+		const quest = questWithId(args[0]);
+		return storage.playerQuest(playerId, quest.id) === undefined ? showCharacter(quest, 0) : alreadyPlaying(quest);
+	}
 	if (browsing && args[0] === 'quests' && args.length === 2) return showQuest(quests, indexIn(args[1], quests));
 	if (browsing && args[0] === 'characters' && args.length === 3) {
 		const quest = questWithId(args[1]);
@@ -207,7 +224,7 @@ function pressButton({ quests, ...turn }: Turn, button: string): Reply {
 		const quest = questWithId(args[0]);
 		const character = quest.characters.find((character) => character.id === args[1]);
 		if (character === undefined) throw unknown;
-		return startQuest({ quests, ...turn }, quest, character);
+		return startQuest(turn, quest, character);
 	}
 	throw unknown;
 }
@@ -281,9 +298,10 @@ function signed(modifier: number): string {
 
 /**
  * Starts `quest` for the Player as `character`, on today's Game Day, with a Sheet of the Character's
- * starting Stats, Traits, and Abilities, and shows it.
+ * starting Stats, Traits, and Abilities, and shows it, unless they are already playing it.
  */
 function startQuest({ gameDay, playerId, storage }: Turn, quest: LoadedQuest, character: Loaded<Character>): Reply {
+	if (storage.playerQuest(playerId, quest.id) !== undefined) return alreadyPlaying(quest);
 	const { abilities, stats, traits } = character;
 	storage.startQuest(playerId, {
 		characterId: character.id,
