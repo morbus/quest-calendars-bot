@@ -67,10 +67,29 @@ export type PlayerQuest = {
  * A {@link PlayerQuest} as {@link Storage.playerQuest} reads it, with its Sheet's Stats, Traits, and Abilities as JSON.
  */
 type PlayerQuestRow = {
+	/**
+	 * The Sheet's Abilities, as JSON.
+	 */
 	abilities: string;
+
+	/**
+	 * The id of the Character the Player picked.
+	 */
 	character_id: string;
+
+	/**
+	 * The Game Day the Player started the Quest, such as "2026-11-13".
+	 */
 	start_game_day: string;
+
+	/**
+	 * The Sheet's Stats, as JSON.
+	 */
 	stats: string;
+
+	/**
+	 * The Sheet's Traits, as JSON.
+	 */
 	traits: string;
 };
 

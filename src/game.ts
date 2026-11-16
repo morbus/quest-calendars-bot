@@ -3,10 +3,10 @@
  */
 
 import { TRAITS, type Character } from './builder.ts';
-import { gameDay } from './calendar.ts';
+import { gameDay, gameDayName } from './calendar.ts';
 import type { ActionRow, Button, Component, TextDisplay } from './components.ts';
 import type { Image, Loaded, LoadedQuest } from './registry.ts';
-import type { PlayerQuest, Storage } from './storage.ts';
+import type { PlayerQuest, Sheet, Storage } from './storage.ts';
 
 /**
  * The game rules, with no knowledge of Discord.
@@ -54,7 +54,7 @@ export type Result = {
 /**
  * What one Input runs with.
  */
-type Turn = {
+type InputContext = {
 	/**
 	 * The Game Day the Input arrived on.
 	 */
@@ -134,13 +134,9 @@ function card(
 }
 
 /**
- * A Character's or Sheet's Stats, Traits, and Abilities, a text each under a bold name.
+ * A Sheet's Stats, Traits, and Abilities, or a Character's starting ones, a text each under a bold name.
  */
-function characterDetails({
-	abilities,
-	stats,
-	traits,
-}: Pick<Character, 'abilities' | 'stats' | 'traits'>): TextDisplay[] {
+function characterDetails({ abilities, stats, traits }: Sheet): TextDisplay[] {
 	const abilityLines = abilities.map((ability) => `- ${ability.name}: ${ability.text}`);
 	return [
 		text(
@@ -196,8 +192,8 @@ export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: stri
  *
  * @throws When no button has that id, such as one left from before the Quests changed.
  */
-function pressButton(turn: Turn, button: string): Reply {
-	const { playerId, quests, storage } = turn;
+function pressButton(context: InputContext, button: string): Reply {
+	const { playerId, quests, storage } = context;
 	const [kind, ...args] = button.split(':');
 	const unknown = new Error(`Unknown button: ${button}`);
 	const questWithId = (id: string | undefined): LoadedQuest => {
@@ -224,7 +220,7 @@ function pressButton(turn: Turn, button: string): Reply {
 		const quest = questWithId(args[0]);
 		const character = quest.characters.find((character) => character.id === args[1]);
 		if (character === undefined) throw unknown;
-		return startQuest(turn, quest, character);
+		return startQuest(context, quest, character);
 	}
 	throw unknown;
 }
@@ -274,14 +270,12 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 /**
  * Shows the Quest the Player just started: the Character they picked, the Game Day they started on, and their Sheet.
  */
-function showStarted(quest: LoadedQuest, { characterId, sheet, startGameDay }: PlayerQuest): Reply {
-	const character = quest.characters.find((character) => character.id === characterId)!;
-	const day = new Date(`${startGameDay}T00:00:00Z`).toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'UTC' });
+function showStarted(quest: LoadedQuest, character: Loaded<Character>, { sheet, startGameDay }: PlayerQuest): Reply {
 	return {
 		components: [
 			card(
 				{ name: quest.name },
-				`You start as ${character.name} on Game Day ${day}.`,
+				`You start as ${character.name} on Game Day ${gameDayName(startGameDay)}.`,
 				characterDetails(sheet),
 				'Use `/quest play` to play your first Page.',
 			),
@@ -300,7 +294,11 @@ function signed(modifier: number): string {
  * Starts `quest` for the Player as `character`, on today's Game Day, with a Sheet of the Character's
  * starting Stats, Traits, and Abilities, and shows it, unless they are already playing it.
  */
-function startQuest({ gameDay, playerId, storage }: Turn, quest: LoadedQuest, character: Loaded<Character>): Reply {
+function startQuest(
+	{ gameDay, playerId, storage }: InputContext,
+	quest: LoadedQuest,
+	character: Loaded<Character>,
+): Reply {
 	if (storage.playerQuest(playerId, quest.id) !== undefined) return alreadyPlaying(quest);
 	const { abilities, stats, traits } = character;
 	storage.startQuest(playerId, {
@@ -309,7 +307,7 @@ function startQuest({ gameDay, playerId, storage }: Turn, quest: LoadedQuest, ch
 		sheet: { abilities, stats, traits },
 		startGameDay: gameDay,
 	});
-	return showStarted(quest, storage.playerQuest(playerId, quest.id)!);
+	return showStarted(quest, character, storage.playerQuest(playerId, quest.id)!);
 }
 
 /**

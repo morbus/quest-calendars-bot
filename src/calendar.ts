@@ -15,3 +15,10 @@ export function gameDay(now: Date, timezone: string): string {
 	const parts = Object.fromEntries(format.formatToParts(now).map(({ type, value }) => [type, value]));
 	return `${parts.year}-${parts.month}-${parts.day}`;
 }
+
+/**
+ * A Game Day, such as "2026-11-13", as Players read it, such as "November 13, 2026".
+ */
+export function gameDayName(day: string): string {
+	return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'UTC' });
+}
