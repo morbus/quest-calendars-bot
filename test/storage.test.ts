@@ -46,7 +46,10 @@ test('a database from a newer version of the bot cannot be opened', async () => 
 	newer.exec('PRAGMA user_version = 999');
 	newer.close();
 
-	assert.throws(() => openStorage(path), /newer version of the bot/);
+	assert.throws(
+		() => openStorage(path),
+		/newer version of the bot: run that version, or restore a copy of this file from before it ran/,
+	);
 });
 
 test('a new database can be opened and used', async () => {

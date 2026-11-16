@@ -152,7 +152,7 @@ export function openStorage(path: string): Storage {
 		const { user_version: version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
 		if (version > MIGRATIONS.length) {
 			throw new Error(
-				`Game state has schema version ${version}, from a newer version of the bot: run that version, or restore a backup this version made`,
+				`Game state has schema version ${version}, from a newer version of the bot: run that version, or restore a copy of this file from before it ran`,
 			);
 		}
 		for (const migration of MIGRATIONS.slice(version)) db.exec(migration);
