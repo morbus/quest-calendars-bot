@@ -432,13 +432,34 @@ test('every screen of every Quest and Character is listed with where it is decla
 		[
 			'pilgrimage/quest.ts',
 			'pilgrimage/quest.ts: characters[0] (pilgrim)',
+			'pilgrimage/quest.ts: characters[0] (pilgrim), once started',
 			'clockwork-tower/quest.ts',
 			'clockwork-tower/quest.ts: characters[0] (warden)',
+			'clockwork-tower/quest.ts: characters[0] (warden), once started',
 			'clockwork-tower/quest.ts: characters[1] (tinker)',
+			'clockwork-tower/quest.ts: characters[1] (tinker), once started',
 		],
 	);
 	const { reply: amberRoad } = game.handle('player-1', 'server-1', { command: 'quest start' }, NOW);
 	assert.deepEqual(screens[0]?.reply, amberRoad);
-	assert.deepEqual(screens[2]?.reply, press(game, amberRoad, 'Next'));
-	assert.deepEqual(screens[4]?.reply, press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next'));
+	assert.deepEqual(screens[3]?.reply, press(game, amberRoad, 'Next'));
+	assert.deepEqual(screens[6]?.reply, press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next'));
+});
+
+test("a Character's screen once started is listed as it shows on the Game Day with the longest name", () => {
+	const game = newGame();
+	// Noon on September 30 in New York.
+	const septemberThirtieth = new Date('2026-09-30T16:00:00Z');
+	const { reply: quests } = game.handle('player-1', 'server-1', { command: 'quest start' }, septemberThirtieth);
+	const towerQuest = game.handle(
+		'player-1',
+		'server-1',
+		{ button: buttonsIn(press(game, quests, 'Next'))[1]!.id },
+		septemberThirtieth,
+	).reply;
+	const tinker = press(game, towerQuest, 'Next');
+
+	const started = game.handle('player-1', 'server-1', { button: buttonsIn(tinker)[1]!.id }, septemberThirtieth).reply;
+
+	assert.deepEqual(everyScreen(QUESTS)[7]?.reply, started);
 });

@@ -52,6 +52,11 @@ export type Result = {
 };
 
 /**
+ * The Game Day whose name, "September 30, 2026", is as long as any Game Day's name can be.
+ */
+const LONGEST_GAME_DAY = '2026-09-30';
+
+/**
  * What one Input runs with.
  */
 type InputContext = {
@@ -176,14 +181,25 @@ export function createGame({
 /**
  * Every screen of every Quest and Character, as Players see it, with where it is declared:
  * the Quest's file, and a Character's place and id in `characters`, so startup can check each fits in Discord.
+ * A Character's screen once started shows the Game Day with the longest name, so it fits on any day.
  */
 export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: string }[] {
 	return quests.flatMap((quest, index) => [
 		{ reply: showQuest(quests, index), source: quest.file },
-		...quest.characters.map((character, i) => ({
-			reply: showCharacter(quest, i),
-			source: `${quest.file}: characters[${i}] (${character.id})`,
-		})),
+		...quest.characters.flatMap((character, i) => {
+			const { abilities, id, stats, traits } = character;
+			const source = `${quest.file}: characters[${i}] (${id})`;
+			const started = {
+				characterId: id,
+				questId: quest.id,
+				sheet: { abilities, stats, traits },
+				startGameDay: LONGEST_GAME_DAY,
+			};
+			return [
+				{ reply: showCharacter(quest, i), source },
+				{ reply: showStarted(quest, character, started), source: `${source}, once started` },
+			];
+		}),
 	]);
 }
 
