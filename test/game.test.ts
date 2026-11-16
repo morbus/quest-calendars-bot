@@ -236,7 +236,7 @@ test('a Character with no Abilities says so', () => {
 	assert.ok(textsIn(reply).includes('**Abilities**\nnone'));
 });
 
-test('choosing a Character starts the Quest with one Page in the Backlog, and a Sheet of their starting Stats, Traits, and Abilities', () => {
+test('choosing a Character starts the Quest with one Page in the Backlog, showing their image and a Sheet of their starting Stats, Traits, and Abilities', () => {
 	const game = newGame();
 
 	const tinker = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next');
@@ -247,6 +247,7 @@ test('choosing a Character starts the Quest with one Page in the Backlog, and a 
 		components: [
 			{
 				components: [
+					{ items: [{ media: image('clockwork-tower/tinker.PNG') }], type: 'mediaGallery' },
 					{
 						content: '## The Clockwork Tower\nYou start as Tinker. Your first Page is ready.',
 						type: 'textDisplay',

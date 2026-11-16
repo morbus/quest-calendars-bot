@@ -288,13 +288,13 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 }
 
 /**
- * Shows the Quest the Player just started: the Character they picked and their Sheet.
+ * Shows the Quest the Player just started: the Character they picked, with their image, and their Sheet.
  */
 function showStarted(quest: LoadedQuest, character: Loaded<Character>, { sheet }: PlayerQuest): Reply {
 	return {
 		components: [
 			card(
-				{ name: quest.name },
+				{ image: character.image, name: quest.name },
 				`You start as ${character.name}. Your first Page is ready.`,
 				characterDetails(sheet),
 				'Use `/quest play` to play it.',
