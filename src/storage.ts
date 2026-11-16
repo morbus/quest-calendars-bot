@@ -121,7 +121,8 @@ export type Storage = {
 	/**
 	 * The Quest with id `questId` that the Player with Discord user ID `playerId` is playing, if they are.
 	 *
-	 * @throws When they are playing it, but it has no Sheet, or it has a Sheet left without the Quest.
+	 * @throws When the game state is damaged: they are playing it but it has no Sheet,
+	 * or they aren't playing it but its Sheet was left behind.
 	 */
 	playerQuest(playerId: string, questId: string): PlayerQuest | undefined;
 
@@ -138,6 +139,14 @@ export type Storage = {
 	 */
 	transaction<T>(work: () => T): T;
 };
+
+/**
+ * The error for game state damaged outside the bot, such as a row deleted by hand,
+ * naming the Player, the Quest, and what `problem` was found.
+ */
+function damaged(playerId: string, questId: string, problem: string): Error {
+	return new Error(`Game state is damaged: ${playerId}'s ${questId} ${problem}`);
+}
 
 /**
  * Opens the SQLite file at `path`, creating it if needed, and brings its schema up to date.
@@ -179,14 +188,14 @@ export function openStorage(path: string): Storage {
 			// startQuest writes both in one transaction, so a Quest without its Sheet, or a Sheet
 			// without its Quest, means the game state was damaged.
 			if (row === undefined) {
-				const sheet = db.prepare('SELECT 1 FROM sheets WHERE player_id = ? AND quest_id = ?').get(playerId, questId);
-				if (sheet !== undefined) {
-					throw new Error(`Game state is damaged: ${playerId}'s ${questId} Sheet has no Quest`);
-				}
+				const leftoverSheet = db
+					.prepare('SELECT 1 FROM sheets WHERE player_id = ? AND quest_id = ?')
+					.get(playerId, questId);
+				if (leftoverSheet !== undefined) throw damaged(playerId, questId, 'Sheet has no Quest');
 				return undefined;
 			}
 			if (row.stats === null || row.traits === null || row.abilities === null) {
-				throw new Error(`Game state is damaged: ${playerId}'s ${questId} Quest has no Sheet`);
+				throw damaged(playerId, questId, 'Quest has no Sheet');
 			}
 			return {
 				characterId: row.character_id,
