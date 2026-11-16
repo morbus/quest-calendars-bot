@@ -91,16 +91,19 @@ const AMBER_ROAD: PlayerQuest = {
 
 test('a Player cannot start a Quest they are already playing', () => {
 	const storage = openStorage(':memory:');
-	storage.startQuest('player-1', AMBER_ROAD);
+	storage.transaction(() => storage.startQuest('player-1', AMBER_ROAD));
 
-	assert.throws(() => storage.startQuest('player-1', AMBER_ROAD), /UNIQUE constraint failed/);
+	assert.throws(
+		() => storage.transaction(() => storage.startQuest('player-1', AMBER_ROAD)),
+		/UNIQUE constraint failed/,
+	);
 });
 
 test("a Player's Quest without its Sheet is an error, not a Quest they aren't playing", async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
 	const storage = openStorage(path);
-	storage.startQuest('player-1', AMBER_ROAD);
+	storage.transaction(() => storage.startQuest('player-1', AMBER_ROAD));
 	const db = new DatabaseSync(path);
 	db.exec("DELETE FROM sheets WHERE player_id = 'player-1'");
 	db.close();
@@ -112,7 +115,7 @@ test("a Player's Sheet without its Quest is an error, not a Quest they aren't pl
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
 	const storage = openStorage(path);
-	storage.startQuest('player-1', AMBER_ROAD);
+	storage.transaction(() => storage.startQuest('player-1', AMBER_ROAD));
 	// With foreign keys off, as in the sqlite3 shell, deleting the Quest leaves its Sheet behind.
 	const db = new DatabaseSync(path, { enableForeignKeyConstraints: false });
 	db.exec("DELETE FROM player_quests WHERE player_id = 'player-1'");
