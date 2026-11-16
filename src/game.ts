@@ -216,7 +216,7 @@ function pressButton(context: InputContext, button: string): Reply {
 		if (!/^\d+$/.test(digits ?? '') || index >= items.length) throw unknown;
 		return index;
 	};
-	// A Quest the Player is already playing shows nothing on the way to starting it again.
+	// A Quest the Player is already playing shows nothing on the way to starting it again, and isn't started again.
 	const unlessPlaying = (quest: LoadedQuest, show: () => Reply): Reply =>
 		storage.playerQuest(playerId, quest.id) === undefined ? show() : alreadyPlaying(quest);
 	const browsing = kind === 'prev' || kind === 'next';
