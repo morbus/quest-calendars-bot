@@ -20,7 +20,16 @@ const BUSY_TIMEOUT_MS = 2000;
  * and its `user_version` counts those it has. Add new ones at the end; never change one.
  */
 const MIGRATIONS = [
-	`CREATE TABLE player_quests (
+	`CREATE TABLE character_sheets (
+		player_id TEXT NOT NULL,
+		quest_id TEXT NOT NULL,
+		stats TEXT NOT NULL,
+		traits TEXT NOT NULL,
+		abilities TEXT NOT NULL,
+		PRIMARY KEY (player_id, quest_id),
+		FOREIGN KEY (player_id, quest_id) REFERENCES player_quests ON DELETE CASCADE
+	) STRICT;
+	CREATE TABLE player_quests (
 		player_id TEXT NOT NULL,
 		quest_id TEXT NOT NULL,
 		character_id TEXT NOT NULL,
@@ -30,17 +39,28 @@ const MIGRATIONS = [
 		backlog_count INTEGER NOT NULL,
 		backlog_updated TEXT NOT NULL,
 		PRIMARY KEY (player_id, quest_id)
-	) STRICT;
-	CREATE TABLE character_sheets (
-		player_id TEXT NOT NULL,
-		quest_id TEXT NOT NULL,
-		stats TEXT NOT NULL,
-		traits TEXT NOT NULL,
-		abilities TEXT NOT NULL,
-		PRIMARY KEY (player_id, quest_id),
-		FOREIGN KEY (player_id, quest_id) REFERENCES player_quests ON DELETE CASCADE
 	) STRICT;`,
 ];
+
+/**
+ * The current state of one Player's Character in one Quest.
+ */
+export type CharacterSheet = {
+	/**
+	 * The Abilities.
+	 */
+	abilities: Ability[];
+
+	/**
+	 * The Stats.
+	 */
+	stats: Stats;
+
+	/**
+	 * The Traits.
+	 */
+	traits: Traits;
+};
 
 /**
  * A Quest a Player is playing.
@@ -89,85 +109,15 @@ export type PlayerQuest = {
 };
 
 /**
- * A {@link PlayerQuest} as {@link Storage.playerQuest} reads it, with its Character Sheet's Stats, Traits, and Abilities as JSON,
- * or `null` when the Quest has no Character Sheet.
- */
-type PlayerQuestRow = {
-	/**
-	 * The Character Sheet's Abilities, as JSON.
-	 */
-	abilities: string | null;
-
-	/**
-	 * How many Pages the Player can play now.
-	 */
-	backlog_count: number;
-
-	/**
-	 * The Game Day the Backlog was last brought up to date.
-	 */
-	backlog_updated: string;
-
-	/**
-	 * The id of the Character the Player picked.
-	 */
-	character_id: string;
-
-	/**
-	 * When the Player last played a Page, or `null` before their first.
-	 */
-	last_played: string | null;
-
-	/**
-	 * How many Pages the Player has played.
-	 */
-	pages_played: number;
-
-	/**
-	 * When the Player started the Quest.
-	 */
-	started: string;
-
-	/**
-	 * The Character Sheet's Stats, as JSON.
-	 */
-	stats: string | null;
-
-	/**
-	 * The Character Sheet's Traits, as JSON.
-	 */
-	traits: string | null;
-};
-
-/**
- * The current state of one Player's Character in one Quest.
- */
-export type CharacterSheet = {
-	/**
-	 * The Abilities, in the order Players see them.
-	 */
-	abilities: Ability[];
-
-	/**
-	 * The Stats.
-	 */
-	stats: Stats;
-
-	/**
-	 * The Traits.
-	 */
-	traits: Traits;
-};
-
-/**
  * Reads and writes the game state in SQLite; open it with {@link openStorage}.
  */
 export type Storage = {
 	/**
 	 * The Quest with id `questId` that the Player with Discord user ID `playerId` is playing, if they are.
 	 *
-	 * @throws When the game state is damaged: they are playing it but it has no Character Sheet,
-	 * or they aren't playing it but its Character Sheet was left behind.
+	 * @throws When the game state is damaged:
+	 *   a Player is playing but has no Character Sheet, or
+	 *   a Player has no Quest, but a Character Sheet was left behind.
 	 */
 	playerQuest(playerId: string, questId: string): PlayerQuest | undefined;
 
@@ -186,8 +136,7 @@ export type Storage = {
 };
 
 /**
- * The error for game state damaged outside the bot, such as a row deleted by hand,
- * naming the Player, the Quest, and what `problem` was found.
+ * The error for when the game state is damaged.
  */
 function damaged(playerId: string, questId: string, problem: string): Error {
 	return new Error(`Game state is damaged: ${playerId}'s ${questId} ${problem}`);
@@ -202,36 +151,65 @@ export function openStorage(path: string): Storage {
 	// Wait for another writer on the same file (an overlapping restart) instead of failing at once.
 	const db = new DatabaseSync(path, { timeout: BUSY_TIMEOUT_MS });
 
+	/**
+	 * Runs `work` in one transaction, rolling it back if `work` throws.
+	 */
+	function transaction<T>(work: () => T): T {
+		db.exec('BEGIN IMMEDIATE');
+		try {
+			const result = work();
+			db.exec('COMMIT');
+			return result;
+		} catch (error) {
+			// SQLite rolls back some failures itself, and
+			// a second ROLLBACK would hide the real error.
+			if (db.isTransaction) db.exec('ROLLBACK');
+			throw error;
+		}
+	}
+
 	// Writing the version number, even unchanged, means a file that isn't a database, or can't be
 	// written to, fails here instead of on the first command. The lock keeps another process
 	// from migrating between the read and the write.
-	db.exec('BEGIN IMMEDIATE');
-	try {
+	transaction(() => {
 		const { user_version: version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
-		if (version > MIGRATIONS.length) {
-			throw new Error(
-				`Game state has schema version ${version}, from a newer version of the bot: run that version, or restore a copy of this file from before it ran`,
-			);
-		}
+		if (version > MIGRATIONS.length)
+			throw new Error(`Game state is newer than expected (${version} > ${MIGRATIONS.length})`);
 		for (const migration of MIGRATIONS.slice(version)) db.exec(migration);
 		db.exec(`PRAGMA user_version = ${MIGRATIONS.length}`);
-		db.exec('COMMIT');
-	} catch (error) {
-		if (db.isTransaction) db.exec('ROLLBACK');
-		throw error;
-	}
+	});
 
 	return {
 		playerQuest(playerId, questId) {
 			const row = db
-				.prepare(
-					`SELECT character_id, started, last_played, pages_played, backlog_count, backlog_updated, stats, traits, abilities
-					FROM player_quests LEFT JOIN character_sheets USING (player_id, quest_id)
-					WHERE player_id = ? AND quest_id = ?`,
-				)
-				.get(playerId, questId) as PlayerQuestRow | undefined;
-			// startQuest writes both in one transaction, so a Quest without its Character Sheet, or a Character Sheet
-			// without its Quest, means the game state was damaged.
+				.prepare(/* sql */ `
+					SELECT
+						character_id,
+						started,
+						last_played,
+						pages_played,
+						backlog_count,
+						backlog_updated,
+						stats,
+						traits,
+						abilities
+					FROM player_quests
+					LEFT JOIN character_sheets USING (player_id, quest_id)
+					WHERE player_id = ? AND quest_id = ?;
+				`)
+				.get(playerId, questId) as
+				| {
+						character_id: string;
+						started: string;
+						last_played: string | null;
+						pages_played: number;
+						backlog_count: number;
+						backlog_updated: string;
+						stats: string | null;
+						traits: string | null;
+						abilities: string | null;
+				  }
+				| undefined;
 			if (row === undefined) {
 				const leftoverCharacterSheet = db
 					.prepare('SELECT 1 FROM character_sheets WHERE player_id = ? AND quest_id = ?')
@@ -261,14 +239,14 @@ export function openStorage(path: string): Storage {
 			playerId,
 			{ backlogCount, backlogUpdated, characterId, characterSheet, lastPlayed, pagesPlayed, questId, started },
 		) {
-			db.prepare(
-				`INSERT INTO player_quests
-				(player_id, quest_id, character_id, started, last_played, pages_played, backlog_count, backlog_updated)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			).run(playerId, questId, characterId, started, lastPlayed, pagesPlayed, backlogCount, backlogUpdated);
-			db.prepare(
-				'INSERT INTO character_sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?)',
-			).run(
+			db.prepare(/* sql */ `
+				INSERT INTO player_quests
+					(player_id, quest_id, character_id, started, last_played, pages_played, backlog_count, backlog_updated)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+			`).run(playerId, questId, characterId, started, lastPlayed, pagesPlayed, backlogCount, backlogUpdated);
+			db.prepare(/* sql */ `
+				INSERT INTO character_sheets (player_id, quest_id, stats, traits, abilities) VALUES (?, ?, ?, ?, ?);
+			`).run(
 				playerId,
 				questId,
 				JSON.stringify(characterSheet.stats),
@@ -276,16 +254,6 @@ export function openStorage(path: string): Storage {
 				JSON.stringify(characterSheet.abilities),
 			);
 		},
-		transaction(work) {
-			db.exec('BEGIN IMMEDIATE');
-			try {
-				const result = work();
-				db.exec('COMMIT');
-				return result;
-			} catch (error) {
-				db.exec('ROLLBACK');
-				throw error;
-			}
-		},
+		transaction,
 	};
 }

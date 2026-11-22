@@ -37,9 +37,9 @@ per **Page** or per **Rest**; limited **Abilities** are used after seeing the ro
 _Avoid_: Power, skill, special ability.
 
 **Rest**:
-A break in which the **Character** recovers, either because a **Page** grants one or because the **Player**
-uses a limited item to take one at the start or end of a **Page**. It refills Health, Spell Points, and per-Rest
-**Abilities** on the **Character Sheet**, clears conditions such as Poisoned, and allows changing equipment and crafting.
+A break in which the **Character** recovers, either because a **Page** grants one or because the **Player** uses a
+limited item to take one at the start or end of a **Page**. It refills Health, Spell Points, and per-Rest **Abilities**
+on the **Character Sheet**, clears conditions such as Poisoned, and allows changing equipment and crafting.
 _Avoid_: Camp, long rest, recovery.
 
 **Character Sheet**:
@@ -69,9 +69,9 @@ roll falls in: prose plus **Effects**, and sometimes further **Actions** or **Ch
 _Avoid_: Resolution, result.
 
 **Effect**:
-One change an **Outcome** makes to the **Character Sheet** or to later rolls, such as losing Health, gaining **Currency**
-or an item, a bonus on the next **Action** or the next **Page**, or a **Note**. "Tomorrow" in **Page** text
-means the **Player**'s next **Page** in that **Quest**, not the next **Game Day**.
+One change an **Outcome** makes to the **Character Sheet** or to later rolls, such as losing Health, gaining
+**Currency** or an item, a bonus on the next **Action** or the next **Page**, or a **Note**. "Tomorrow" in
+**Page** text means the **Player**'s next **Page** in that **Quest**, not the next **Game Day**.
 _Avoid_: Consequence, modifier.
 
 **Note**:

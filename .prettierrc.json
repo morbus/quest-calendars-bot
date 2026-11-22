@@ -5,5 +5,10 @@
 	"singleQuote": true,
 	"quoteProps": "as-needed",
 	"trailingComma": "all",
-	"endOfLine": "lf"
+	"endOfLine": "lf",
+	"plugins": ["prettier-plugin-embed", "prettier-plugin-sql-cst"],
+	"embeddedSqlPlugin": "prettier-plugin-sql-cst",
+	"embeddedSqlParser": "sqlite",
+	"embeddedSqlTags": ["sql"],
+	"sqlParamTypes": ["?"]
 }
