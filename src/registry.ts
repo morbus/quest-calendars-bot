@@ -72,12 +72,17 @@ export type Image = {
 /**
  * A Quest or a Character as loaded, with its image read in place of the authored path.
  */
-export type Loaded<T extends { image?: string }> = Omit<T, 'image'> & {
+type Loaded<T extends { image?: string }> = Omit<T, 'image'> & {
 	/**
 	 * The image to show with it, if any.
 	 */
 	image?: Image;
 };
+
+/**
+ * A Character as loaded, with its image read in place of the authored path.
+ */
+export type LoadedCharacter = Loaded<Character>;
 
 /**
  * A Quest as loaded: its Characters, in the order listed, and itself, each with its image read.
@@ -86,7 +91,7 @@ export type LoadedQuest = Omit<Loaded<Quest>, 'characters'> & {
 	/**
 	 * The Quest's Characters, in the order Players see them.
 	 */
-	characters: Loaded<Character>[];
+	characters: LoadedCharacter[];
 
 	/**
 	 * The `quest.ts` that declared it, to name in errors.
@@ -106,7 +111,7 @@ function byName(a: { name: string }, b: { name: string }): number {
  *
  * @throws When it isn't.
  */
-function checkCharacter(character: Character, questDir: string): Loaded<Character> {
+function checkCharacter(character: Character, questDir: string): LoadedCharacter {
 	checkId(character.id);
 	checkName(character.name);
 	checkText('description', character.description);

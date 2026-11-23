@@ -2,15 +2,10 @@
  * The game rules: turns a Player's Input into a Reply.
  */
 
-import { TRAITS, type Character } from './builder.ts';
-import type { ActionRow, Button, Component, TextDisplay } from './components.ts';
-import type { Image, Loaded, LoadedQuest } from './registry.ts';
-import type { CharacterSheet, PlayerQuest, Storage } from './storage.ts';
-
-/**
- * A start time for screens that look the same whenever the Player starts.
- */
-const ANY_START = new Date(0);
+import { TRAITS } from './builder.ts';
+import type { ActionRow, Button, Component, Container, MediaGallery, TextDisplay } from './components.ts';
+import type { Image, LoadedCharacter, LoadedQuest } from './registry.ts';
+import type { Storage } from './storage.ts';
 
 /**
  * The game rules, with no knowledge of Discord.
@@ -36,11 +31,6 @@ export type Input = { command: 'quest start' } | { button: string };
  * What one Input runs with.
  */
 type InputContext = {
-	/**
-	 * The Game Day the Input arrived on.
-	 */
-	gameDay: string;
-
 	/**
 	 * When the Input arrived.
 	 */
@@ -86,16 +76,25 @@ export type Result = {
 };
 
 /**
- * Refuses to start `quest` again for a Player already playing it, pointing them to what they can do instead.
+ * Refuses to start `quest` again for a Player already playing it.
  */
 function alreadyPlaying(quest: LoadedQuest): Reply {
-	return {
-		components: [
-			text(
-				`You're already playing ${quest.name}. Use \`/quest play\` to play your next Page, or \`/quest abandon\` to wipe it and start again.`,
-			),
-		],
-	};
+	const advice = `You're already playing _${quest.name}_. Use \`/quest play\` to play your next Page, or \`/quest abandon\` to wipe it and start again.`;
+	return { components: [box([...banner(quest.image), text(advice)])] };
+}
+
+/**
+ * `image` shown large across the top of a box, or nothing when there's no image.
+ */
+function banner(image: Image | undefined): MediaGallery[] {
+	return image === undefined ? [] : [{ items: [{ media: image }], type: 'mediaGallery' }];
+}
+
+/**
+ * A box around `parts`, in order.
+ */
+function box(parts: Container['components']): Container {
+	return { components: parts, type: 'container' };
 }
 
 /**
@@ -129,31 +128,14 @@ function card(
 	description: string,
 	details: TextDisplay[],
 	footer: string,
-): Component {
-	return {
-		components: [
-			...(image === undefined ? [] : [{ items: [{ media: image }], type: 'mediaGallery' as const }]),
-			text(`## ${name}\n${description}`),
-			...details,
-			{ type: 'separator' },
-			text(`-# ${footer}`),
-		],
-		type: 'container',
-	};
-}
-
-/**
- * A Character Sheet's Stats, Traits, and Abilities, or a Character's starting ones, a text each under a bold name.
- */
-function characterDetails({ abilities, stats, traits }: CharacterSheet): TextDisplay[] {
-	const abilityLines = abilities.map((ability) => `- ${ability.name}: ${ability.text}`);
-	return [
-		text(
-			`**Stats**\nMax Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`,
-		),
-		text(`**Traits**\n${TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ')}`),
-		text(`**Abilities**\n${abilityLines.length === 0 ? 'none' : abilityLines.join('\n')}`),
-	];
+): Container {
+	return box([
+		...banner(image),
+		text(`## ${name}\n${description}`),
+		...details,
+		{ type: 'separator' },
+		text(`-# ${footer}`),
+	]);
 }
 
 /**
@@ -161,66 +143,39 @@ function characterDetails({ abilities, stats, traits }: CharacterSheet): TextDis
  *
  * @param quests - Every loaded Quest.
  * @param storage - Holds every Player's Quests and Character Sheets.
- * @param timezone - The IANA timezone whose midnight starts each Game Day, such as "America/New_York".
  */
-export function createGame({
-	quests,
-	storage,
-	timezone,
-}: {
-	quests: LoadedQuest[];
-	storage: Storage;
-	timezone: string;
-}): Game {
+export function createGame({ quests, storage }: { quests: LoadedQuest[]; storage: Storage }): Game {
 	return {
 		handle(playerId, _serverId, input, now) {
 			return storage.transaction(() => {
 				if ('command' in input) return { reply: showQuest(quests, 0) };
-				return {
-					reply: pressButton({ gameDay: gameDay(now, timezone), now, playerId, quests, storage }, input.button),
-				};
+				return { reply: pressButton({ now, playerId, quests, storage }, input.button) };
 			});
 		},
 	};
 }
 
 /**
- * Every screen of every Quest and Character, as Players see it, with where it is declared:
- * the Quest's file, and a Character's place and id in `characters`, so startup can check each fits in Discord.
- * A Character's screen once started looks the same whenever they start.
+ * Every screen of every Quest and Character, as Players see it, and where
+ * it is declared, so startup can check each fits within Discord's limits.
  */
 export function everyScreen(quests: LoadedQuest[]): { reply: Reply; source: string }[] {
 	return quests.flatMap((quest, index) => [
 		{ reply: showQuest(quests, index), source: quest.file },
 		...quest.characters.flatMap((character, i) => {
 			const source = `${quest.file}: characters[${i}] (${character.id})`;
-			const started = startedQuest(quest, character, gameDay(ANY_START, 'UTC'), ANY_START);
 			return [
-				{ reply: showCharacter(quest, i), source },
-				{ reply: showStarted(quest, character, started), source: `${source}, once started` },
+				{ reply: showQuestCharacter(quest, i), source },
+				{ reply: showQuestStarted(quest, character), source: `${source}, once started` },
 			];
 		}),
 	]);
 }
 
 /**
- * The Game Day `now` falls on in `timezone`, as its date, such as "2026-11-13".
- */
-export function gameDay(now: Date, timezone: string): string {
-	const format = new Intl.DateTimeFormat('en-US', {
-		day: '2-digit',
-		month: '2-digit',
-		timeZone: timezone,
-		year: 'numeric',
-	});
-	const parts = Object.fromEntries(format.formatToParts(now).map(({ type, value }) => [type, value]));
-	return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-/**
- * What pressing the button with id `button` does, and shows.
+ * What pressing the button with id `button` does and shows.
  *
- * @throws When no button has that id, such as one left from before the Quests changed.
+ * @throws When no button has that id.
  */
 function pressButton(context: InputContext, button: string): Reply {
 	const { playerId, quests, storage } = context;
@@ -236,18 +191,18 @@ function pressButton(context: InputContext, button: string): Reply {
 		if (!/^\d+$/.test(digits ?? '') || index >= items.length) throw unknown;
 		return index;
 	};
-	// A Quest the Player is already playing shows nothing on the way to starting it again, and isn't started again.
+	// A Quest the Player is already playing isn't started again.
 	const unlessPlaying = (quest: LoadedQuest, show: () => Reply): Reply =>
 		storage.playerQuest(playerId, quest.id) === undefined ? show() : alreadyPlaying(quest);
 	const browsing = kind === 'prev' || kind === 'next';
 	if (kind === 'quest' && args.length === 1) {
 		const quest = questWithId(args[0]);
-		return unlessPlaying(quest, () => showCharacter(quest, 0));
+		return unlessPlaying(quest, () => showQuestCharacter(quest, 0));
 	}
 	if (browsing && args[0] === 'quests' && args.length === 2) return showQuest(quests, indexIn(args[1], quests));
 	if (browsing && args[0] === 'characters' && args.length === 3) {
 		const quest = questWithId(args[1]);
-		return unlessPlaying(quest, () => showCharacter(quest, indexIn(args[2], quest.characters)));
+		return unlessPlaying(quest, () => showQuestCharacter(quest, indexIn(args[2], quest.characters)));
 	}
 	if (kind === 'character' && args.length === 2) {
 		const quest = questWithId(args[0]);
@@ -256,30 +211,6 @@ function pressButton(context: InputContext, button: string): Reply {
 		return unlessPlaying(quest, () => startQuest(context, quest, character));
 	}
 	throw unknown;
-}
-
-/**
- * Shows the Character at `index` in `quest` on its own, with their Stats, Traits, and Abilities,
- * and buttons to choose them or move to the others.
- */
-function showCharacter(quest: LoadedQuest, index: number): Reply {
-	const character = quest.characters[index]!;
-	const choose: Button = {
-		id: `character:${quest.id}:${character.id}`,
-		label: 'Choose this Character',
-		type: 'button',
-	};
-	return {
-		components: [
-			card(
-				character,
-				character.description,
-				characterDetails(character),
-				`Character ${index + 1} of ${quest.characters.length} in ${quest.name}`,
-			),
-			browseRow(`characters:${quest.id}`, index, quest.characters.length, choose),
-		],
-	};
 }
 
 /**
@@ -301,16 +232,48 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 }
 
 /**
- * Shows the Quest the Player just started: the Character they picked, with their image, and their Character Sheet.
+ * Shows the Character at `index` in `quest` on its own, with their Stats,
+ * Traits, and Abilities, and buttons to choose them or move to the others.
  */
-function showStarted(quest: LoadedQuest, character: Loaded<Character>, { characterSheet }: PlayerQuest): Reply {
+function showQuestCharacter(quest: LoadedQuest, index: number): Reply {
+	const character = quest.characters[index]!;
+	const { abilities, stats, traits } = character;
+	const statLines = `Max Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`;
+	const traitLines = TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ');
+	const abilityLines = abilities.map((ability) => `- ${ability.name}: ${ability.text}`);
+	const choose: Button = {
+		id: `character:${quest.id}:${character.id}`,
+		label: 'Choose this Character',
+		type: 'button',
+	};
+	return {
+		components: [
+			card(
+				character,
+				character.description,
+				[
+					text(`**Stats**\n${statLines}`),
+					text(`**Traits**\n${traitLines}`),
+					text(`**Abilities**\n${abilityLines.length === 0 ? 'none' : abilityLines.join('\n')}`),
+				],
+				`Character ${index + 1} of ${quest.characters.length} in ${quest.name}`,
+			),
+			browseRow(`characters:${quest.id}`, index, quest.characters.length, choose),
+		],
+	};
+}
+
+/**
+ * Shows the Quest the Player just started: the Character they picked, with their image.
+ */
+function showQuestStarted(quest: LoadedQuest, character: LoadedCharacter): Reply {
 	return {
 		components: [
 			card(
 				{ image: character.image, name: quest.name },
 				`You start as ${character.name}. Your first Page is ready.`,
-				characterDetails(characterSheet),
-				'Use `/quest play` to play it.',
+				[text('**TODO** Instructions go here. `/quest play`'), text('**TODO** More instructions go here.')],
+				'**TODO** Replace with page counter.',
 			),
 		],
 	};
@@ -324,34 +287,22 @@ function signed(modifier: number): string {
 }
 
 /**
- * `quest` as started by a Player as `character` at `now`, on the Game Day `startGameDay`: its first Page
- * in their Backlog, none played yet, and a Character Sheet of the Character's starting Stats, Traits, and Abilities.
+ * Starts `quest` for the Player as `character`, now, with its first Page in their Backlog, none played
+ * yet, and a Character Sheet of the Character's starting Stats, Traits, and Abilities, and shows it.
  */
-function startedQuest(quest: LoadedQuest, character: Loaded<Character>, startGameDay: string, now: Date): PlayerQuest {
+function startQuest({ now, playerId, storage }: InputContext, quest: LoadedQuest, character: LoadedCharacter): Reply {
 	const { abilities, stats, traits } = character;
-	return {
+	storage.startQuest(playerId, {
 		backlogCount: 1,
-		backlogUpdated: startGameDay,
+		backlogUpdated: now.toISOString(),
 		characterId: character.id,
 		characterSheet: { abilities, stats, traits },
 		lastPlayed: null,
 		pagesPlayed: 0,
 		questId: quest.id,
 		started: now.toISOString(),
-	};
-}
-
-/**
- * Starts `quest` for the Player as `character`, now, with its first Page in their Backlog
- * and a Character Sheet of the Character's starting Stats, Traits, and Abilities, and shows it.
- */
-function startQuest(
-	{ gameDay, now, playerId, storage }: InputContext,
-	quest: LoadedQuest,
-	character: Loaded<Character>,
-): Reply {
-	storage.startQuest(playerId, startedQuest(quest, character, gameDay, now));
-	return showStarted(quest, character, storage.playerQuest(playerId, quest.id)!);
+	});
+	return showQuestStarted(quest, character);
 }
 
 /**

@@ -71,7 +71,7 @@ _Avoid_: Resolution, result.
 **Effect**:
 One change an **Outcome** makes to the **Character Sheet** or to later rolls, such as losing Health, gaining
 **Currency** or an item, a bonus on the next **Action** or the next **Page**, or a **Note**. "Tomorrow" in
-**Page** text means the **Player**'s next **Page** in that **Quest**, not the next **Game Day**.
+**Page** text means the **Player**'s next **Page** in that **Quest**, not the next day.
 _Avoid_: Consequence, modifier.
 
 **Note**:
@@ -81,11 +81,6 @@ _Avoid_: Flag, "written down".
 
 **Choice**:
 A set of lettered **Actions** on a **Page** from which the **Player** picks exactly one.
-
-**Game Day**:
-The calendar day, rolling over at midnight in the game's single timezone,
-on which a **Player** earns one more **Page** in each **Quest** they are playing.
-_Avoid_: Quest Day.
 
 **Backlog**:
 The **Pages** a **Player** has earned in a **Quest** but not yet played;
@@ -112,6 +107,6 @@ An optional set of game mechanics, such as the Crafting or Minions,, that a **Qu
 - A **Player** picks one of a **Quest**'s **Characters** when starting it, and has one **Character Sheet** per **Quest**.
 - A **Page** contains one or more **Actions**, some grouped into **Choices**.
 - A **Quest** contains many **Pages** in a fixed order.
-- Each **Game Day** adds one **Page** to the **Player**'s **Backlog** for each **Quest** they are playing, up to 14.
+- Each day, rolling over at midnight in the local timezone, add one **Page** to the **Player**'s **Backlog** for each **Quest** they are playing, up to 14.
 - Finishing a **Page** produces one **Announcement**; the **Page**'s content is visible only to that **Player**.
 - An **Announcement** is posted in the **Announcement Channel** of every Discord server the **Player** is a member of that has one.

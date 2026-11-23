@@ -77,7 +77,7 @@ test('a migration that fails partway leaves the database as it was, so it can be
  */
 const AMBER_ROAD: PlayerQuest = {
 	backlogCount: 1,
-	backlogUpdated: '2026-11-13',
+	backlogUpdated: '2026-11-13T09:00:00.000Z',
 	characterId: 'pilgrim',
 	characterSheet: {
 		abilities: [],

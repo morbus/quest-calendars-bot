@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Button, Component } from '../src/components.ts';
-import { createGame, everyScreen, gameDay, type Game, type Reply } from '../src/game.ts';
+import { createGame, everyScreen, type Game, type Reply } from '../src/game.ts';
 import { loadQuests, MAX_ID_LENGTH, type Image, type LoadedQuest } from '../src/registry.ts';
 import { openStorage } from '../src/storage.ts';
 
@@ -74,7 +74,7 @@ function buttonStates(reply: Reply): { disabled: boolean; label: string }[] {
  * A Game with in-memory storage and the given Quests.
  */
 function newGame(quests: LoadedQuest[] = QUESTS): Game {
-	return createGame({ quests, storage: openStorage(':memory:'), timezone: 'America/New_York' });
+	return createGame({ quests, storage: openStorage(':memory:') });
 }
 
 test('/quest start shows the first Quest on its own, with buttons to choose it or move through the rest', () => {
@@ -236,7 +236,7 @@ test('a Character with no Abilities says so', () => {
 	assert.ok(textsIn(reply).includes('**Abilities**\nnone'));
 });
 
-test('choosing a Character starts the Quest with one Page in the Backlog, showing their image and a Character Sheet of their starting Stats, Traits, and Abilities', () => {
+test('choosing a Character starts the Quest with one Page in the Backlog, showing their image', () => {
 	const game = newGame();
 
 	const tinker = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next');
@@ -252,18 +252,10 @@ test('choosing a Character starts the Quest with one Page in the Backlog, showin
 						content: '## The Clockwork Tower\nYou start as Tinker. Your first Page is ready.',
 						type: 'textDisplay',
 					},
-					{ content: '**Stats**\nMax Health 10, Defense +2, Attack +1, Damage d6', type: 'textDisplay' },
-					{
-						content: '**Traits**\nStrength -1, Dexterity +2, Constitution +0, Intellect +3, Wisdom +1, Charisma +0',
-						type: 'textDisplay',
-					},
-					{
-						content:
-							'**Abilities**\n- Gadgeteer: Once per Rest: add d4 to an Intellect roll.\n- Spare Parts: Add +1 to rolls to repair.',
-						type: 'textDisplay',
-					},
+					{ content: '**TODO** Instructions go here. `/quest play`', type: 'textDisplay' },
+					{ content: '**TODO** More instructions go here.', type: 'textDisplay' },
 					{ type: 'separator' },
-					{ content: '-# Use `/quest play` to play it.', type: 'textDisplay' },
+					{ content: '-# **TODO** Replace with page counter.', type: 'textDisplay' },
 				],
 				type: 'container',
 			},
@@ -277,9 +269,14 @@ test('choosing a Character starts the Quest with one Page in the Backlog, showin
 const ALREADY_PLAYING: Reply = {
 	components: [
 		{
-			content:
-				"You're already playing The Amber Road. Use `/quest play` to play your next Page, or `/quest abandon` to wipe it and start again.",
-			type: 'textDisplay',
+			components: [
+				{
+					content:
+						"You're already playing _The Amber Road_. Use `/quest play` to play your next Page, or `/quest abandon` to wipe it and start again.",
+					type: 'textDisplay',
+				},
+			],
+			type: 'container',
 		},
 	],
 };
@@ -314,16 +311,28 @@ test('another Player can start a Quest someone else is already playing', () => {
 	assert.equal(textsIn(reply)[0], '## The Amber Road\nYou start as Pilgrim. Your first Page is ready.');
 });
 
-test('moving through the Characters of a Quest the Player is already playing is refused', () => {
+test('moving through the Characters of a Quest the Player is already playing is refused, under the Quest image', () => {
 	const game = newGame();
 	const characters = chooseQuest(game, 'The Clockwork Tower');
 	press(game, characters, 'Choose this Character');
 
 	const next = press(game, characters, 'Next');
 
-	assert.deepEqual(textsIn(next), [
-		"You're already playing The Clockwork Tower. Use `/quest play` to play your next Page, or `/quest abandon` to wipe it and start again.",
-	]);
+	assert.deepEqual(next, {
+		components: [
+			{
+				components: [
+					{ items: [{ media: image('clockwork-tower/tower.png') }], type: 'mediaGallery' },
+					{
+						content:
+							"You're already playing _The Clockwork Tower_. Use `/quest play` to play your next Page, or `/quest abandon` to wipe it and start again.",
+						type: 'textDisplay',
+					},
+				],
+				type: 'container',
+			},
+		],
+	});
 });
 
 test('a Quest started in one server is already being played in another server and outside any server', () => {
@@ -346,10 +355,10 @@ test('a Player playing one Quest can start another', () => {
 test('a Quest started before the bot restarts is still being played after it', async () => {
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
-	const before = createGame({ quests: QUESTS, storage: openStorage(path), timezone: 'America/New_York' });
+	const before = createGame({ quests: QUESTS, storage: openStorage(path) });
 	press(before, chooseQuest(before, 'The Amber Road'), 'Choose this Character');
 
-	const after = createGame({ quests: QUESTS, storage: openStorage(path), timezone: 'America/New_York' });
+	const after = createGame({ quests: QUESTS, storage: openStorage(path) });
 
 	assert.deepEqual(chooseQuest(after, 'The Amber Road'), ALREADY_PLAYING);
 });
@@ -454,12 +463,4 @@ test("a Character's screen once started is listed as it shows whenever they star
 	const started = press(game, tinker, 'Choose this Character');
 
 	assert.deepEqual(everyScreen(QUESTS)[7]?.reply, started);
-});
-
-test("a Game Day rolls over at midnight in the game's timezone, not at midnight UTC", () => {
-	// 10:30 PM on November 20 in New York.
-	const lateEvening = new Date('2026-11-21T03:30:00Z');
-
-	assert.equal(gameDay(lateEvening, 'America/New_York'), '2026-11-20');
-	assert.equal(gameDay(lateEvening, 'UTC'), '2026-11-21');
 });

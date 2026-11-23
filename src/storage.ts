@@ -72,7 +72,7 @@ export type PlayerQuest = {
 	backlogCount: number;
 
 	/**
-	 * The Game Day the Backlog was last brought up to date, such as "2026-11-13".
+	 * When the Backlog was last updated, as a UTC timestamp such as "2026-11-13T09:00:00.000Z".
 	 */
 	backlogUpdated: string;
 
