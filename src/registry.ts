@@ -145,6 +145,25 @@ function checkId(id: unknown): void {
 }
 
 /**
+ * Accepts a Quest or Character name, which Players see as a heading and in the small text below it.
+ *
+ * @throws When it isn't one line of text of at most {@link MAX_NAME_LENGTH} characters.
+ */
+function checkName(name: unknown): void {
+	checkText('name', name, MAX_NAME_LENGTH);
+	if (/[\r\n]/.test(name as string)) fail('name', 'one line', name);
+}
+
+/**
+ * Accepts an object, such as the Stats.
+ *
+ * @throws When `value`, at `field`, isn't one.
+ */
+function checkObject(field: string, value: unknown): void {
+	if (typeof value !== 'object' || value === null) fail(field, 'an object', value);
+}
+
+/**
  * Accepts a valid Quest, in `questDir`, with its image and its Characters' images read.
  *
  * @throws When it isn't, naming a Character's place in `characters` when the problem is with one.
@@ -183,25 +202,6 @@ function checkQuest(value: unknown, questDir: string): Omit<LoadedQuest, 'file'>
 		}
 	});
 	return { ...withImage(quest, questDir), characters };
-}
-
-/**
- * Accepts a Quest or Character name, which Players see as a heading and in the small text below it.
- *
- * @throws When it isn't one line of text of at most {@link MAX_NAME_LENGTH} characters.
- */
-function checkName(name: unknown): void {
-	checkText('name', name, MAX_NAME_LENGTH);
-	if (/[\r\n]/.test(name as string)) fail('name', 'one line', name);
-}
-
-/**
- * Accepts an object, such as the Stats.
- *
- * @throws When `value`, at `field`, isn't one.
- */
-function checkObject(field: string, value: unknown): void {
-	if (typeof value !== 'object' || value === null) fail(field, 'an object', value);
 }
 
 /**
