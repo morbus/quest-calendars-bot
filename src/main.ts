@@ -26,18 +26,6 @@ const EXIT_GRACE_MS = 1000;
 const PROJECT_DIR = fileURLToPath(new URL('..', import.meta.url));
 
 /**
- * Whether `timezone` is one `Intl` accepts, such as "America/New_York" or "+05:00".
- */
-function isTimezone(timezone: string): boolean {
-	try {
-		new Intl.DateTimeFormat('en-US', { timeZone: timezone });
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-/**
  * Starts the bot.
  *
  * @remarks
@@ -46,20 +34,12 @@ function isTimezone(timezone: string): boolean {
  * to exit shortly after, in case something such as the Discord client still holds Node open.
  */
 async function main(): Promise<void> {
-	const { DISCORD_TOKEN: token, GAME_TIMEZONE: timezone, QUESTS_DIR: questsPath } = process.env;
+	const { DISCORD_TOKEN: token, QUESTS_DIR: questsPath } = process.env;
 	logger.info('Starting Quest Calendars Bot');
 
-	if (!token || !timezone || !questsPath) {
-		const missing = [!token && 'DISCORD_TOKEN', !timezone && 'GAME_TIMEZONE', !questsPath && 'QUESTS_DIR'].filter(
-			Boolean,
-		);
+	if (!token || !questsPath) {
+		const missing = [!token && 'DISCORD_TOKEN', !questsPath && 'QUESTS_DIR'].filter(Boolean);
 		logger.error(`Missing environment variables: ${missing.join(', ')}`);
-		process.exitCode = 1;
-		return;
-	}
-
-	if (!isTimezone(timezone)) {
-		logger.error(`GAME_TIMEZONE is not a valid timezone: ${timezone}`);
 		process.exitCode = 1;
 		return;
 	}
