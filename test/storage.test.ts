@@ -46,7 +46,7 @@ test('a database from a newer version of the bot cannot be opened', async () => 
 	newer.exec('PRAGMA user_version = 999');
 	newer.close();
 
-	assert.throws(() => openStorage(path), /Game state is newer than expected \(999 > /);
+	assert.throws(() => openStorage(path), /Game state newer than known \(999 > /);
 });
 
 test('a new database can be opened and used', async () => {
@@ -63,11 +63,18 @@ test('a migration that fails partway leaves the database as it was, so it can be
 	await using dir = await mkdtempDisposable(join(tmpdir(), 'quest-calendars-bot-'));
 	const path = join(dir.path, 'game.sqlite');
 	const old = new DatabaseSync(path);
-	old.exec('CREATE TABLE character_sheets (note TEXT)');
+	// The migration's second table, so the first is created before it fails.
+	old.exec('CREATE TABLE player_quests (note TEXT)');
 
-	assert.throws(() => openStorage(path), /table character_sheets already exists/);
+	assert.throws(() => openStorage(path), /table player_quests already exists/);
 
-	old.exec('DROP TABLE character_sheets');
+	const tables = old.prepare("SELECT name FROM sqlite_schema WHERE type = 'table'").all();
+	assert.deepEqual(
+		tables.map(({ name }) => name),
+		['player_quests'],
+	);
+	assert.equal(old.prepare('PRAGMA user_version').get()?.user_version, 0);
+	old.exec('DROP TABLE player_quests');
 	old.close();
 	assert.doesNotThrow(() => openStorage(path));
 });

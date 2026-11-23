@@ -335,6 +335,32 @@ test('moving through the Characters of a Quest the Player is already playing is 
 	});
 });
 
+test('choosing a Character saves the Quest with one Page in the Backlog and a Character Sheet of their starting Stats, Traits, and Abilities', () => {
+	const storage = openStorage(':memory:');
+	const game = createGame({ quests: QUESTS, storage });
+	const tinker = press(game, chooseQuest(game, 'The Clockwork Tower'), 'Next');
+
+	press(game, tinker, 'Choose this Character');
+
+	assert.deepEqual(storage.playerQuest('player-1', 'clockwork-tower'), {
+		backlogCount: 1,
+		backlogUpdated: NOW.toISOString(),
+		characterId: 'tinker',
+		characterSheet: {
+			stats: { attack: 1, damage: 'd6', defense: 2, maxHealth: 10 },
+			traits: { strength: -1, dexterity: 2, constitution: 0, intellect: 3, wisdom: 1, charisma: 0 },
+			abilities: [
+				{ name: 'Gadgeteer', text: 'Once per Rest: add d4 to an Intellect roll.' },
+				{ name: 'Spare Parts', text: 'Add +1 to rolls to repair.' },
+			],
+		},
+		lastPlayed: null,
+		pagesPlayed: 0,
+		questId: 'clockwork-tower',
+		started: NOW.toISOString(),
+	});
+});
+
 test('a Quest started in one server is already being played in another server and outside any server', () => {
 	const game = newGame();
 	press(game, chooseQuest(game, 'The Amber Road', 'server-1'), 'Choose this Character', 'server-1');

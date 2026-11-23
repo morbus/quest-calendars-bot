@@ -191,7 +191,6 @@ function pressButton(context: InputContext, button: string): Reply {
 		if (!/^\d+$/.test(digits ?? '') || index >= items.length) throw unknown;
 		return index;
 	};
-	// A Quest the Player is already playing isn't started again.
 	const unlessPlaying = (quest: LoadedQuest, show: () => Reply): Reply =>
 		storage.playerQuest(playerId, quest.id) === undefined ? show() : alreadyPlaying(quest);
 	const browsing = kind === 'prev' || kind === 'next';
@@ -238,8 +237,8 @@ function showQuest(quests: LoadedQuest[], index: number): Reply {
 function showQuestCharacter(quest: LoadedQuest, index: number): Reply {
 	const character = quest.characters[index]!;
 	const { abilities, stats, traits } = character;
-	const statLines = `Max Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`;
-	const traitLines = TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ');
+	const statLine = `Max Health ${stats.maxHealth}, Defense ${signed(stats.defense)}, Attack ${signed(stats.attack)}, Damage ${stats.damage}`;
+	const traitLine = TRAITS.map((trait) => `${capitalize(trait)} ${signed(traits[trait])}`).join(', ');
 	const abilityLines = abilities.map((ability) => `- ${ability.name}: ${ability.text}`);
 	const choose: Button = {
 		id: `character:${quest.id}:${character.id}`,
@@ -252,8 +251,8 @@ function showQuestCharacter(quest: LoadedQuest, index: number): Reply {
 				character,
 				character.description,
 				[
-					text(`**Stats**\n${statLines}`),
-					text(`**Traits**\n${traitLines}`),
+					text(`**Stats**\n${statLine}`),
+					text(`**Traits**\n${traitLine}`),
 					text(`**Abilities**\n${abilityLines.length === 0 ? 'none' : abilityLines.join('\n')}`),
 				],
 				`Character ${index + 1} of ${quest.characters.length} in ${quest.name}`,

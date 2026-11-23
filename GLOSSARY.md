@@ -107,6 +107,6 @@ An optional set of game mechanics, such as the Crafting or Minions,, that a **Qu
 - A **Player** picks one of a **Quest**'s **Characters** when starting it, and has one **Character Sheet** per **Quest**.
 - A **Page** contains one or more **Actions**, some grouped into **Choices**.
 - A **Quest** contains many **Pages** in a fixed order.
-- Each day, rolling over at midnight in the local timezone, add one **Page** to the **Player**'s **Backlog** for each **Quest** they are playing, up to 14.
+- Each day, rolling over at midnight in the bot's timezone, adds one **Page** to the **Player**'s **Backlog** for each **Quest** they are playing, up to 14.
 - Finishing a **Page** produces one **Announcement**; the **Page**'s content is visible only to that **Player**.
 - An **Announcement** is posted in the **Announcement Channel** of every Discord server the **Player** is a member of that has one.

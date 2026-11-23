@@ -20,26 +20,31 @@ const BUSY_TIMEOUT_MS = 2000;
  * and its `user_version` counts those it has. Add new ones at the end; never change one.
  */
 const MIGRATIONS = [
-	`CREATE TABLE character_sheets (
-		player_id TEXT NOT NULL,
-		quest_id TEXT NOT NULL,
-		stats TEXT NOT NULL,
-		traits TEXT NOT NULL,
-		abilities TEXT NOT NULL,
-		PRIMARY KEY (player_id, quest_id),
-		FOREIGN KEY (player_id, quest_id) REFERENCES player_quests ON DELETE CASCADE
-	) STRICT;
-	CREATE TABLE player_quests (
-		player_id TEXT NOT NULL,
-		quest_id TEXT NOT NULL,
-		character_id TEXT NOT NULL,
-		started TEXT NOT NULL,
-		last_played TEXT,
-		pages_played INTEGER NOT NULL,
-		backlog_count INTEGER NOT NULL,
-		backlog_updated TEXT NOT NULL,
-		PRIMARY KEY (player_id, quest_id)
-	) STRICT;`,
+	/* sql */ `
+		CREATE TABLE character_sheets (
+			player_id TEXT NOT NULL,
+			quest_id TEXT NOT NULL,
+			stats TEXT NOT NULL,
+			traits TEXT NOT NULL,
+			abilities TEXT NOT NULL,
+			PRIMARY KEY (player_id, quest_id),
+			FOREIGN KEY (player_id, quest_id) REFERENCES player_quests
+				ON DELETE CASCADE
+		)
+		STRICT;
+		CREATE TABLE player_quests (
+			player_id TEXT NOT NULL,
+			quest_id TEXT NOT NULL,
+			character_id TEXT NOT NULL,
+			started TEXT NOT NULL,
+			last_played TEXT,
+			pages_played INTEGER NOT NULL,
+			backlog_count INTEGER NOT NULL,
+			backlog_updated TEXT NOT NULL,
+			PRIMARY KEY (player_id, quest_id)
+		)
+		STRICT;
+	`,
 ];
 
 /**
@@ -155,15 +160,15 @@ export function openStorage(path: string): Storage {
 	 * Runs `work` in one transaction, rolling it back if `work` throws.
 	 */
 	function transaction<T>(work: () => T): T {
-		db.exec('BEGIN IMMEDIATE');
+		db.exec(/* sql */ `BEGIN IMMEDIATE;`);
 		try {
 			const result = work();
-			db.exec('COMMIT');
+			db.exec(/* sql */ `COMMIT;`);
 			return result;
 		} catch (error) {
 			// SQLite rolls back some failures itself, and
 			// a second ROLLBACK would hide the real error.
-			if (db.isTransaction) db.exec('ROLLBACK');
+			if (db.isTransaction) db.exec(/* sql */ `ROLLBACK;`);
 			throw error;
 		}
 	}
@@ -172,11 +177,10 @@ export function openStorage(path: string): Storage {
 	// written to, fails here instead of on the first command. The lock keeps another process
 	// from migrating between the read and the write.
 	transaction(() => {
-		const { user_version: version } = db.prepare('PRAGMA user_version').get() as { user_version: number };
-		if (version > MIGRATIONS.length)
-			throw new Error(`Game state is newer than expected (${version} > ${MIGRATIONS.length})`);
+		const { user_version: version } = db.prepare(/* sql */ `PRAGMA user_version;`).get() as { user_version: number };
+		if (version > MIGRATIONS.length) throw new Error(`Game state newer than known (${version} > ${MIGRATIONS.length})`);
 		for (const migration of MIGRATIONS.slice(version)) db.exec(migration);
-		db.exec(`PRAGMA user_version = ${MIGRATIONS.length}`);
+		db.exec(/* sql */ `PRAGMA user_version = ${MIGRATIONS.length};`);
 	});
 
 	return {
@@ -212,7 +216,7 @@ export function openStorage(path: string): Storage {
 				| undefined;
 			if (row === undefined) {
 				const leftoverCharacterSheet = db
-					.prepare('SELECT 1 FROM character_sheets WHERE player_id = ? AND quest_id = ?')
+					.prepare(/* sql */ `SELECT 1 FROM character_sheets WHERE player_id = ? AND quest_id = ?;`)
 					.get(playerId, questId);
 				if (leftoverCharacterSheet !== undefined) throw damaged(playerId, questId, 'Character Sheet has no Quest');
 				return undefined;
